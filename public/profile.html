@@ -1,0 +1,397 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#2b1348" />
+<title>我的 · 幸运刮刮乐</title>
+<link rel="icon" href="/favicon.svg" />
+<link rel="stylesheet" href="/lucky-account.css" />
+</head>
+<body>
+<div class="auth-shell profile-shell">
+  <div class="orb a"></div><div class="orb b"></div>
+
+  <main class="auth-card wide" id="app" hidden>
+    <a href="/" class="back-btn" aria-label="返回游戏"><span aria-hidden="true">‹</span> 返回</a>
+    <div class="brand"><div class="mark">✦</div><b>LUCKY<i>·</i>SCRATCH</b></div>
+
+    <div class="profile-hero">
+      <div class="avatar-big" id="avatarBig">🍀</div>
+      <div class="profile-id">
+        <h1 id="displayNameOut">玩家</h1>
+        <div class="uname" id="usernameOut">@player</div>
+        <div class="since" id="sinceOut"></div>
+      </div>
+    </div>
+
+    <!-- game progress (read-only, from the local save) -->
+    <section class="section">
+      <h2>游戏进度</h2>
+      <div class="stat-grid">
+        <div class="stat coins"><span>余额</span><strong><i class="coin-dot"></i><span id="stCoins">—</span></strong></div>
+        <div class="stat"><span>等级</span><strong id="stLevel">—</strong></div>
+        <div class="stat"><span>已刮张数</span><strong id="stTickets">—</strong></div>
+        <div class="stat"><span>最高奖金</span><strong id="stBest" style="color:var(--cyan)">—</strong></div>
+      </div>
+      <p class="hint" id="noSaveHint" style="margin-top:9px;display:none"></p>
+    </section>
+
+    <!-- game log (spend / win history) -->
+    <section class="section">
+      <h2>游戏流水</h2>
+      <div class="log-summary">
+        <div><span>支出</span><b id="logSpent">—</b></div>
+        <div><span>赢得</span><b id="logWon">—</b></div>
+        <div><span>净收益</span><b id="logNet">—</b></div>
+      </div>
+      <div class="ios-group log-list" id="logList" aria-live="polite"></div>
+      <p class="hint" id="logEmpty" style="display:none;margin-top:2px">还没有记录，去刮一张吧</p>
+    </section>
+
+    <!-- editable identity -->
+    <section class="section">
+      <h2>个人资料</h2>
+      <div class="form-error" id="profileError" role="alert"></div>
+      <form id="profileForm" novalidate>
+        <div class="ios-group">
+          <div class="ios-row" id="f-display"><span class="ios-cap">昵称</span><input class="ios-input" id="displayName" type="text" maxlength="40" autocomplete="nickname" placeholder="昵称" aria-label="昵称" /></div>
+          <div class="ios-row" id="f-email"><span class="ios-cap">邮箱</span><input class="ios-input" id="email" type="email" autocomplete="email" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="you@example.com" aria-label="邮箱" /></div>
+          <div class="ios-row ios-block">
+            <span class="ios-cap">头像</span>
+            <div class="picker">
+              <div class="emoji-row" id="emojiRow" role="group" aria-label="选择头像"></div>
+              <div class="color-row" id="colorRow" role="group" aria-label="选择主题色"></div>
+            </div>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary" id="saveProfile" style="margin-top:14px">保存</button>
+      </form>
+    </section>
+
+    <!-- password -->
+    <section class="section">
+      <h2>修改密码</h2>
+      <div class="form-error" id="pwError" role="alert"></div>
+      <form id="pwForm" novalidate autocomplete="off">
+        <div class="ios-group">
+          <div class="ios-row" id="f-cur"><span class="ios-cap">当前密码</span><input class="ios-input" id="curPw" type="password" autocomplete="current-password" placeholder="必填" aria-label="当前密码" /><button type="button" class="reveal" data-target="curPw" aria-label="显示密码">显示</button></div>
+          <div class="ios-row" id="f-new"><span class="ios-cap">新密码</span><input class="ios-input" id="newPw" type="password" autocomplete="new-password" placeholder="至少4位" aria-label="新密码" /><button type="button" class="reveal" data-target="newPw" aria-label="显示密码">显示</button></div>
+        </div>
+        <div class="strength" id="strength" data-score="0" aria-hidden="true" style="margin-top:11px"><i></i><i></i><i></i><i></i></div>
+        <div class="hint" id="h-new" style="margin-top:6px"></div>
+        <button type="submit" class="btn btn-ghost" id="changePw" style="margin-top:12px">更新密码</button>
+      </form>
+    </section>
+
+    <!-- game settings synced to the save -->
+    <section class="section">
+      <h2>游戏设置</h2>
+      <div class="ios-group">
+        <label class="ios-row" for="soundToggle"><span class="name">音效</span><input class="switch" type="checkbox" id="soundToggle" /></label>
+        <label class="ios-row" for="vibToggle"><span class="name">振动</span><input class="switch" type="checkbox" id="vibToggle" /></label>
+      </div>
+      <p class="hint" id="settingsHint" style="display:none"></p>
+    </section>
+
+    <!-- actions -->
+    <section class="section">
+      <div class="btn-row">
+        <button type="button" class="btn btn-ghost" id="signOut">退出登录</button>
+      </div>
+    </section>
+
+    <!-- danger -->
+    <section class="section">
+      <h2>危险操作</h2>
+      <div class="ios-group">
+        <button type="button" class="ios-row destructive" id="deleteBtn">删除账户</button>
+      </div>
+    </section>
+
+    <p class="auth-note"><span>本地演示 · 账户仅保存在本设备</span></p>
+  </main>
+</div>
+
+<!-- delete confirm (iOS action sheet) -->
+<div class="modal-back" id="delModal" role="dialog" aria-modal="true" aria-labelledby="delTitle">
+  <div class="modal">
+    <div class="grabber"></div>
+    <h3 id="delTitle">删除账户？</h3>
+    <p>将永久删除 <b id="delName">该账户</b>，且无法恢复。</p>
+    <div class="ios-group" style="margin-top:14px">
+      <label class="ios-row" for="wipeGame"><span class="name">同时清除游戏进度</span><input class="switch" type="checkbox" id="wipeGame" /></label>
+    </div>
+    <div class="sheet-actions">
+      <button type="button" class="btn btn-danger" id="delConfirm">确认删除</button>
+      <button type="button" class="btn btn-ghost" id="delCancel">取消</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="/lucky-account.js"></script>
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+
+  // ---- auth guard ----
+  if (!LuckyAuth.requireAuthOr("/login.html")) return;
+  var acc = LuckyAuth.current();
+
+  var toast = $("toast"), toastTimer;
+  function showToast(msg, kind) {
+    toast.textContent = msg;
+    toast.className = "toast on" + (kind ? " " + kind : "");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { toast.className = "toast"; }, 2600);
+  }
+
+  var chosenAvatar = acc.avatar, chosenColor = acc.color;
+
+  function renderHeader() {
+    $("displayNameOut").textContent = acc.displayName;
+    $("usernameOut").textContent = "@" + acc.username;
+    var big = $("avatarBig");
+    big.textContent = acc.avatar;
+    big.style.boxShadow = "inset 0 1px #ffffff20, 0 0 26px " + hexA(acc.color, .55);
+    big.style.borderColor = hexA(acc.color, .6);
+    try {
+      var d = new Date(acc.createdAt);
+      $("sinceOut").textContent = "注册于 " + d.toLocaleDateString("zh-CN", { year: "numeric", month: "long", day: "numeric" });
+    } catch (e) { $("sinceOut").textContent = ""; }
+  }
+  function hexA(hex, a) {
+    var h = String(hex).replace("#", "");
+    if (h.length !== 6) return hex;
+    var r = parseInt(h.substr(0, 2), 16), g = parseInt(h.substr(2, 2), 16), b = parseInt(h.substr(4, 2), 16);
+    return "rgba(" + r + "," + g + "," + b + "," + a + ")";
+  }
+
+  // ---- game progress ----
+  function renderProgress() {
+    var p = LuckyAuth.gameProgress();
+    if (!p) {
+      // No game save for this account yet — show the account's starting balance
+      // (the "20,000 coins" promised at sign-up), not a misleading 0.
+      $("noSaveHint").style.display = "block";
+      $("settingsHint").style.display = "block";
+      $("soundToggle").checked = true; $("vibToggle").checked = true;
+      $("stCoins").textContent = LuckyAuth.formatCoins(acc.coins || 0);
+      $("stLevel").textContent = "1";
+      $("stTickets").textContent = "0";
+      $("stBest").textContent = "0";
+      return;
+    }
+    $("stCoins").textContent = LuckyAuth.formatCoins(p.coins);
+    $("stLevel").textContent = String(p.level);
+    $("stTickets").textContent = LuckyAuth.formatCoins(p.ticketsPlayed);
+    $("stBest").textContent = LuckyAuth.formatCoins(p.bestWin);
+    $("soundToggle").checked = p.settings.sound;
+    $("vibToggle").checked = p.settings.vibration;
+  }
+
+  // ---- game log ----
+  function fmtTime(t) {
+    try { return new Date(t).toLocaleString("zh-CN", { month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" }); }
+    catch (e) { return ""; }
+  }
+  var LOG_META = {
+    buy:    { ic: "🎟️", pos: false, label: function (e) { return e.n || "彩票"; } },
+    win:    { ic: "🎉", pos: true,  label: function (e) { return (e.n ? e.n + " " : "") + "中奖"; } },
+    daily:  { ic: "🎁", pos: true,  label: function () { return "每日奖励"; } },
+    rescue: { ic: "🛟", pos: true,  label: function () { return "每日救济"; } }
+  };
+  function renderLog() {
+    var p = LuckyAuth.gameProgress();
+    var spent = p ? p.totalSpent : 0, won = p ? p.totalWon : 0, net = won - spent;
+    $("logSpent").textContent = LuckyAuth.formatCoins(spent);
+    $("logWon").textContent = LuckyAuth.formatCoins(won);
+    var netEl = $("logNet");
+    netEl.textContent = (net > 0 ? "+" : net < 0 ? "−" : "") + LuckyAuth.formatCoins(Math.abs(net));
+    netEl.className = net > 0 ? "pos" : net < 0 ? "neg" : "";
+
+    var list = $("logList");
+    list.textContent = "";
+    var log = (p && p.log) || [];
+    if (!log.length) { list.style.display = "none"; $("logEmpty").style.display = "block"; return; }
+    list.style.display = ""; $("logEmpty").style.display = "none";
+
+    log.forEach(function (e) {
+      var m = LOG_META[e.k] || { ic: "•", pos: (Number(e.a) || 0) >= 0, label: function () { return "记录"; } };
+      var row = document.createElement("div");
+      row.className = "ios-row log-row";
+      var ic = document.createElement("span"); ic.className = "log-ic"; ic.textContent = m.ic;
+      var main = document.createElement("div"); main.className = "log-main";
+      var b = document.createElement("b"); b.textContent = m.label(e);
+      var small = document.createElement("small"); small.textContent = fmtTime(e.t);
+      main.appendChild(b); main.appendChild(small);
+      var val = document.createElement("span");
+      val.className = "log-amt " + (m.pos ? "pos" : "neg");
+      val.textContent = (m.pos ? "+" : "−") + LuckyAuth.formatCoins(Number(e.a) || 0);
+      row.appendChild(ic); row.appendChild(main); row.appendChild(val);
+      list.appendChild(row);
+    });
+  }
+
+  // ---- pickers ----
+  function buildPickers() {
+    var emojiRow = $("emojiRow"), colorRow = $("colorRow");
+    LuckyAuth.AVATARS.forEach(function (emo) {
+      var b = document.createElement("button");
+      b.type = "button"; b.className = "emoji-opt"; b.textContent = emo;
+      b.setAttribute("aria-pressed", emo === chosenAvatar ? "true" : "false");
+      b.setAttribute("aria-label", "Avatar " + emo);
+      b.onclick = function () {
+        chosenAvatar = emo;
+        emojiRow.querySelectorAll(".emoji-opt").forEach(function (el) { el.setAttribute("aria-pressed", "false"); });
+        b.setAttribute("aria-pressed", "true");
+      };
+      emojiRow.appendChild(b);
+    });
+    LuckyAuth.COLORS.forEach(function (col) {
+      var b = document.createElement("button");
+      b.type = "button"; b.className = "color-opt"; b.style.background = col; b.style.color = col;
+      b.setAttribute("aria-pressed", col === chosenColor ? "true" : "false");
+      b.setAttribute("aria-label", "Accent colour " + col);
+      b.onclick = function () {
+        chosenColor = col;
+        colorRow.querySelectorAll(".color-opt").forEach(function (el) { el.setAttribute("aria-pressed", "false"); });
+        b.setAttribute("aria-pressed", "true");
+      };
+      colorRow.appendChild(b);
+    });
+  }
+
+  // reveal buttons
+  document.querySelectorAll(".reveal").forEach(function (btn) {
+    btn.onclick = function () {
+      var inp = $(btn.dataset.target);
+      var show = inp.type === "password";
+      inp.type = show ? "text" : "password";
+      btn.textContent = show ? "隐藏" : "显示";
+      btn.setAttribute("aria-label", (show ? "隐藏" : "显示") + "密码");
+    };
+  });
+  $("newPw").addEventListener("input", function () {
+    $("strength").setAttribute("data-score", String(LuckyAuth.passwordScore(this.value)));
+  });
+
+  // ---- init ----
+  $("displayName").value = acc.displayName;
+  $("email").value = acc.email;
+  renderHeader();
+  renderProgress();
+  renderLog();
+  buildPickers();
+  $("app").hidden = false;
+
+  // ---- save profile ----
+  $("profileForm").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var pe = $("profileError"); pe.className = "form-error";
+    $("f-email").classList.remove("bad"); $("f-display").classList.remove("bad");
+
+    var res = LuckyAuth.updateProfile({
+      displayName: $("displayName").value,
+      email: $("email").value,
+      avatar: chosenAvatar,
+      color: chosenColor
+    });
+    if (!res.ok) {
+      pe.textContent = res.error; pe.className = "form-error on";
+      if (/email/i.test(res.error)) $("f-email").classList.add("bad");
+      showToast(res.error, "err");
+      return;
+    }
+    acc = LuckyAuth.current();
+    renderHeader();
+    showToast("资料已保存", "ok");
+  });
+
+  // ---- change password ----
+  $("pwForm").addEventListener("submit", async function (e) {
+    e.preventDefault();
+    var pe = $("pwError"); pe.className = "form-error";
+    $("f-cur").classList.remove("bad"); $("f-new").classList.remove("bad");
+    $("h-new").classList.remove("err"); $("h-new").textContent = "";
+
+    var cur = $("curPw").value, nw = $("newPw").value;
+    var btn = $("changePw"); btn.disabled = true; btn.textContent = "更新中…";
+    try {
+      var res = await LuckyAuth.changePassword(cur, nw);
+      if (!res.ok) {
+        pe.textContent = res.error; pe.className = "form-error on";
+        if (/current/i.test(res.error)) $("f-cur").classList.add("bad");
+        if (/character/i.test(res.error)) $("f-new").classList.add("bad");
+        return;
+      }
+      $("pwForm").reset();
+      $("strength").setAttribute("data-score", "0");
+      showToast("密码已更新", "ok");
+    } finally {
+      btn.disabled = false; btn.textContent = "更新密码";
+    }
+  });
+
+  // ---- settings sync ----
+  function syncSetting(patch, label) {
+    var ok = LuckyAuth.setGameSettings(patch);
+    if (ok) showToast(label + "已保存", "ok");
+    else showToast("请先开始游戏再调整设置", "err");
+  }
+  $("soundToggle").addEventListener("change", function () { syncSetting({ sound: this.checked }, "音效"); });
+  $("vibToggle").addEventListener("change", function () { syncSetting({ vibration: this.checked }, "振动"); });
+
+  // ---- sign out ----
+  $("signOut").onclick = function () {
+    LuckyAuth.logout();
+    location.href = "/login.html";
+  };
+
+  // ---- delete (accessible modal: focus trap, Escape, restore focus) ----
+  var delModal = $("delModal");
+  var appMain = $("app");
+  var lastFocus = null;
+  $("delName").textContent = "@" + acc.username;
+
+  function modalFocusables() {
+    return [$("wipeGame"), $("delConfirm"), $("delCancel")].filter(function (el) { return el && !el.disabled; });
+  }
+  function onModalKey(e) {
+    if (e.key === "Escape") { e.preventDefault(); closeDelModal(); return; }
+    if (e.key !== "Tab") return;
+    var f = modalFocusables(); if (!f.length) return;
+    var first = f[0], last = f[f.length - 1], a = document.activeElement;
+    if (e.shiftKey && (a === first || !delModal.contains(a))) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && (a === last || !delModal.contains(a))) { e.preventDefault(); first.focus(); }
+  }
+  function openDelModal() {
+    lastFocus = document.activeElement;
+    delModal.classList.add("on");
+    appMain.setAttribute("inert", "");
+    appMain.setAttribute("aria-hidden", "true");
+    document.addEventListener("keydown", onModalKey, true);
+    $("delCancel").focus();
+  }
+  function closeDelModal() {
+    delModal.classList.remove("on");
+    appMain.removeAttribute("inert");
+    appMain.removeAttribute("aria-hidden");
+    document.removeEventListener("keydown", onModalKey, true);
+    if (lastFocus && lastFocus.focus) lastFocus.focus();
+  }
+  $("deleteBtn").onclick = openDelModal;
+  $("delCancel").onclick = closeDelModal;
+  delModal.addEventListener("mousedown", function (e) { if (e.target === delModal) closeDelModal(); });
+  $("delConfirm").onclick = function () {
+    document.removeEventListener("keydown", onModalKey, true);
+    appMain.removeAttribute("inert");
+    LuckyAuth.deleteAccount($("wipeGame").checked);
+    location.replace("/register.html");
+  };
+})();
+</script>
+</body>
+</html>

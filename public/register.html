@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#2b1348" />
+<title>注册 · 幸运刮刮乐</title>
+<link rel="icon" href="/favicon.svg" />
+<link rel="stylesheet" href="/lucky-account.css" />
+</head>
+<body>
+<div class="auth-shell">
+  <div class="orb a"></div><div class="orb b"></div>
+
+  <main class="auth-card tight">
+    <div class="brand"><div class="mark">✦</div><b>LUCKY<i>·</i>SCRATCH</b></div>
+    <div class="auth-head">
+      <h1>注册账户</h1>
+    </div>
+
+    <div class="form-error" id="formError" role="alert"></div>
+
+    <form id="regForm" novalidate autocomplete="on">
+      <div class="grid2">
+        <div class="field" id="f-username">
+          <label for="username">用户名</label>
+          <div class="control"><input id="username" name="username" type="text" inputmode="text" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="luckystar" maxlength="20" /></div>
+          <div class="hint" id="h-username"></div>
+        </div>
+        <div class="field" id="f-display">
+          <label for="displayName">昵称 <em>选填</em></label>
+          <div class="control"><input id="displayName" name="displayName" type="text" autocomplete="nickname" placeholder="选填" maxlength="40" /></div>
+        </div>
+      </div>
+
+      <div class="field" id="f-email">
+        <label for="email">邮箱</label>
+        <div class="control"><input id="email" name="email" type="email" autocomplete="email" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="you@example.com" /></div>
+        <div class="hint" id="h-email"></div>
+      </div>
+
+      <div class="grid2">
+        <div class="field" id="f-password">
+          <label for="password">密码</label>
+          <div class="control has-btn">
+            <input id="password" name="password" type="password" autocomplete="new-password" placeholder="至少4位" />
+            <button type="button" class="reveal" data-target="password" aria-label="显示密码">显示</button>
+          </div>
+          <div class="strength" id="strength" data-score="0" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+          <div class="hint" id="h-password"></div>
+        </div>
+        <div class="field" id="f-confirm">
+          <label for="confirm">确认</label>
+          <div class="control has-btn">
+            <input id="confirm" name="confirm" type="password" autocomplete="new-password" placeholder="再次输入" />
+            <button type="button" class="reveal" data-target="confirm" aria-label="显示密码">显示</button>
+          </div>
+          <div class="hint" id="h-confirm"></div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>头像</label>
+        <div class="picker">
+          <div class="emoji-row compact" id="emojiRow" role="group" aria-label="选择头像"></div>
+          <div class="color-row" id="colorRow" role="group" aria-label="选择主题色"></div>
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-primary" id="submitBtn">注册</button>
+    </form>
+
+    <p class="auth-alt">已有账户？<a href="/login.html">登录</a></p>
+
+    <p class="auth-note"><span>本地演示 · 账户仅保存在本设备</span></p>
+  </main>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="/lucky-account.js"></script>
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var toast = $("toast"), toastTimer;
+  function showToast(msg, kind) {
+    toast.textContent = msg;
+    toast.className = "toast on" + (kind ? " " + kind : "");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { toast.className = "toast"; }, 2600);
+  }
+
+  // If already signed in, head to the game instead of re-registering.
+  if (LuckyAuth.current()) { location.replace(LuckyAuth.safeNext("/")); return; }
+
+  // avatar + colour pickers
+  var chosenAvatar = LuckyAuth.AVATARS[0], chosenColor = LuckyAuth.COLORS[0];
+  var emojiRow = $("emojiRow"), colorRow = $("colorRow");
+  LuckyAuth.AVATARS.forEach(function (emo, i) {
+    var b = document.createElement("button");
+    b.type = "button"; b.className = "emoji-opt"; b.textContent = emo;
+    b.setAttribute("aria-pressed", i === 0 ? "true" : "false");
+    b.setAttribute("aria-label", "头像 " + emo);
+    b.onclick = function () {
+      chosenAvatar = emo;
+      emojiRow.querySelectorAll(".emoji-opt").forEach(function (el) { el.setAttribute("aria-pressed", "false"); });
+      b.setAttribute("aria-pressed", "true");
+    };
+    emojiRow.appendChild(b);
+  });
+  LuckyAuth.COLORS.forEach(function (col, i) {
+    var b = document.createElement("button");
+    b.type = "button"; b.className = "color-opt"; b.style.background = col; b.style.color = col;
+    b.setAttribute("aria-pressed", i === 0 ? "true" : "false");
+    b.setAttribute("aria-label", "主题色 " + col);
+    b.onclick = function () {
+      chosenColor = col;
+      colorRow.querySelectorAll(".color-opt").forEach(function (el) { el.setAttribute("aria-pressed", "false"); });
+      b.setAttribute("aria-pressed", "true");
+    };
+    colorRow.appendChild(b);
+  });
+
+  // show/hide password
+  document.querySelectorAll(".reveal").forEach(function (btn) {
+    btn.onclick = function () {
+      var inp = $(btn.dataset.target);
+      var show = inp.type === "password";
+      inp.type = show ? "text" : "password";
+      btn.textContent = show ? "隐藏" : "显示";
+      btn.setAttribute("aria-label", (show ? "隐藏" : "显示") + "密码");
+    };
+  });
+
+  // strength meter
+  $("password").addEventListener("input", function () {
+    $("strength").setAttribute("data-score", String(LuckyAuth.passwordScore(this.value)));
+  });
+
+  function setErr(fieldId, hintId, msg) {
+    $(fieldId).classList.toggle("bad", !!msg);
+    if (hintId) {
+      var h = $(hintId);
+      if (msg) { h.textContent = msg; h.classList.add("err"); }
+      else { h.classList.remove("err"); }
+    }
+  }
+
+  var form = $("regForm"), submitBtn = $("submitBtn"), formError = $("formError");
+  form.addEventListener("submit", async function (e) {
+    e.preventDefault();
+    formError.className = "form-error";
+
+    var username = $("username").value.trim();
+    var email = $("email").value.trim();
+    var password = $("password").value;
+    var confirm = $("confirm").value;
+    var displayName = $("displayName").value.trim();
+
+    var uErr = LuckyAuth.validateUsername(username);
+    var eErr = LuckyAuth.validateEmail(email);
+    var pErr = LuckyAuth.validatePassword(password);
+    var cErr = password !== confirm ? "两次输入的密码不一致" : null;
+
+    setErr("f-username", "h-username", uErr);
+    if (!uErr) $("h-username").textContent = "";
+    setErr("f-email", "h-email", eErr);
+    if (!eErr) $("h-email").textContent = "";
+    setErr("f-password", "h-password", pErr);
+    if (!pErr) $("h-password").textContent = "";
+    setErr("f-confirm", "h-confirm", cErr);
+    if (!cErr) $("h-confirm").textContent = "";
+
+    if (uErr || eErr || pErr || cErr) { showToast("请检查标红的项", "err"); return; }
+
+    submitBtn.disabled = true; submitBtn.textContent = "注册中…";
+    try {
+      var res = await LuckyAuth.register({
+        username: username, email: email, password: password,
+        displayName: displayName, avatar: chosenAvatar, color: chosenColor
+      });
+      if (!res.ok) {
+        formError.textContent = res.error; formError.className = "form-error on";
+        submitBtn.disabled = false; submitBtn.textContent = "注册";
+        return;
+      }
+      showToast("欢迎，" + res.account.displayName + "！", "ok");
+      setTimeout(function () { location.href = LuckyAuth.safeNext("/"); }, 650);
+    } catch (err) {
+      formError.textContent = "注册失败，请稍后再试。";
+      formError.className = "form-error on";
+      submitBtn.disabled = false; submitBtn.textContent = "注册";
+    }
+  });
+})();
+</script>
+</body>
+</html>

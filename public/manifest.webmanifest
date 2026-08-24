@@ -1,0 +1,12 @@
+{
+  "name": "Lucky Scratch",
+  "short_name": "Lucky",
+  "description": "A fast, tactile neon scratch-card game with virtual coins.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#09040f",
+  "theme_color": "#12071a",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
