@@ -2,6 +2,13 @@
 import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } from "vinext/server/image-optimization";
 import handler from "vinext/server/app-router-entry";
 import { handleConfigApi } from "./config-api";
+import {
+  handleManagerAuthApi,
+  handleManagerPageGate,
+  isManagerLoginPagePath,
+  isManagerPagePath,
+  secureManagerPageResponse,
+} from "./manager-auth";
 
 interface Env {
   ASSETS: Fetcher;
@@ -31,6 +38,12 @@ const worker = {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
 
+    const managerAuthResponse = await handleManagerAuthApi(request, env);
+    if (managerAuthResponse) return managerAuthResponse;
+
+    const managerPageGateResponse = await handleManagerPageGate(request, env);
+    if (managerPageGateResponse) return managerPageGateResponse;
+
     const configResponse = await handleConfigApi(request, env);
     if (configResponse) return configResponse;
 
@@ -45,7 +58,11 @@ const worker = {
       }, allowedWidths);
     }
 
-    return handler.fetch(request, env, ctx);
+    const response = await handler.fetch(request, env, ctx);
+    if (isManagerPagePath(url.pathname) || isManagerLoginPagePath(url.pathname)) {
+      return secureManagerPageResponse(response);
+    }
+    return response;
   },
 };
 
