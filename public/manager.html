@@ -55,6 +55,16 @@
   .brand h1{margin:0;font-size:15px;font-weight:800;letter-spacing:.02em;white-space:nowrap}
   .brand p{margin:0;font-size:11px;color:var(--dim);white-space:nowrap}
   .topbar-spacer{flex:1}
+  .sync-status{
+    display:inline-flex;align-items:center;gap:7px;padding:5px 11px;border-radius:999px;
+    border:1px solid var(--line-strong);color:var(--muted);font-size:12px;font-weight:700;white-space:nowrap;
+  }
+  .sync-status i{width:7px;height:7px;border-radius:50%;background:var(--dim);flex:none}
+  .sync-status[data-state="loading"] i{background:var(--warn);animation:blink 1.1s infinite}
+  .sync-status[data-state="synced"]{color:var(--ok);border-color:color-mix(in srgb,var(--ok) 38%,transparent);background:color-mix(in srgb,var(--ok) 9%,transparent)}
+  .sync-status[data-state="synced"] i{background:var(--ok)}
+  .sync-status[data-state="error"]{color:var(--danger);border-color:color-mix(in srgb,var(--danger) 38%,transparent);background:color-mix(in srgb,var(--danger) 8%,transparent)}
+  .sync-status[data-state="error"] i{background:var(--danger)}
   .dirty{
     display:none;align-items:center;gap:7px;padding:5px 11px;border-radius:999px;
     background:color-mix(in srgb,var(--warn) 15%,transparent);
@@ -462,6 +472,7 @@
     .brand p{display:none}
     .brand h1{font-size:15px}
     .topbar-spacer{display:none}
+    .sync-status{margin-left:auto;order:2}
     .dirty{margin-left:auto;order:2}
     .actions{
       order:3;width:100%;flex-wrap:nowrap;overflow-x:auto;gap:8px;
@@ -710,11 +721,13 @@
     </div>
   </div>
   <div class="topbar-spacer"></div>
+  <div class="sync-status" id="syncStatus" data-state="loading" role="status"><i></i><span>正在连接云端</span></div>
   <div class="dirty" id="dirty"><i></i>有未保存的更改</div>
   <button class="btn theme-toggle" id="themeToggle" type="button" title="切换深色 / 浅色">☾</button>
   <div class="actions">
     <button class="btn" id="btnExport">导出配置</button>
     <button class="btn" id="btnImport">导入配置</button>
+    <button class="btn" id="btnSyncKey" type="button">同步密钥</button>
     <button class="btn btn-danger" id="btnReset">恢复默认</button>
     <button class="btn btn-primary" id="btnSave" disabled>保存并应用</button>
   </div>
@@ -836,9 +849,8 @@
     </section>
 
     <p class="foot">
-      配置保存在浏览器 <code>localStorage</code> 的 <code>lucky_config_v1</code> 键里，游戏启动时读取。
-      保存后请<b>刷新游戏页面</b>生效。清空该键即可回到内置默认值。
-      本后台不含任何服务端，只对当前这台设备/这个浏览器生效。
+      点击<b>保存并应用</b>会把配置同步到 Cloudflare，所有设备上的游戏会自动获取新版本。
+      浏览器仍会在 <code>lucky_config_v1</code> 保留离线副本；同步密钥只保存在当前标签页会话中。
     </p>
   </div>
 
@@ -925,6 +937,12 @@
   "use strict";
 
   var CONFIG_KEY = "lucky_config_v1";
+  var CONFIG_VERSION_KEY = "lucky_config_version_v1";
+  var DRAFT_KEY = "lucky_config_draft_v1";
+  var DRAFT_VERSION_KEY = "lucky_config_draft_base_v1";
+  var CONFIG_API = "/api/config";
+  var TOKEN_KEY = "lucky_manager_token_v1";
+  var CHANNEL_NAME = "lucky-config";
   var SCHEMA_VERSION = 1;
 
   // Mirrors the built-in defaults in app/page.tsx. Keep in sync if the game changes.
@@ -935,16 +953,16 @@
       multiplierMinLevel: 3,
       odds: { m0: 0.45, m1: 0.33, m2: 0.16, m3: 0.06 },
       tiers: [
-        { id: "starter_100x", name: "100X Starter", shortName: "100X", maxLabel: "100X", feature: "Classic match-to-win",
+        { id: "starter_100x", name: "100X Starter", shortName: "100X", maxLabel: "100X", feature: "经典对号中奖",
           cost: 500, unlockLevel: 1, accent: "#d743ff", accent2: "#7c2eff",
           prizePool: [50, 100, 250, 500, 750, 1500], multipliers: [2, 5, 10], specialChance: 0.06 },
-        { id: "gem_rush", name: "Gem Rush", shortName: "GEM", maxLabel: "250X", feature: "More multiplier gems",
+        { id: "gem_rush", name: "Gem Rush", shortName: "GEM", maxLabel: "250X", feature: "更多倍数宝石",
           cost: 1000, unlockLevel: 4, accent: "#24e4d1", accent2: "#0c8295",
           prizePool: [100, 250, 500, 1000, 2000, 3500], multipliers: [2, 5, 10], specialChance: 0.16 },
-        { id: "neon_vault", name: "Neon Vault", shortName: "VAULT", maxLabel: "500X", feature: "High-value vault prizes",
+        { id: "neon_vault", name: "Neon Vault", shortName: "VAULT", maxLabel: "500X", feature: "高额金库奖金",
           cost: 2500, unlockLevel: 8, accent: "#6c72ff", accent2: "#30238f",
           prizePool: [250, 500, 1000, 2500, 5000, 10000], multipliers: [2, 5, 10], specialChance: 0.2 },
-        { id: "crown_2000x", name: "2000X Crown", shortName: "CROWN", maxLabel: "2000X", feature: "Rare crowns and huge wins",
+        { id: "crown_2000x", name: "2000X Crown", shortName: "CROWN", maxLabel: "2000X", feature: "稀有皇冠 巨额奖金",
           cost: 5000, unlockLevel: 15, accent: "#ffb648", accent2: "#9d3b25",
           prizePool: [500, 1000, 2500, 5000, 10000, 25000], multipliers: [2, 5, 10, 100], specialChance: 0.24 }
       ]
@@ -954,6 +972,16 @@
   var cfg = null;      // working copy
   var saved = null;    // last-persisted snapshot, for dirty comparison
   var active = 0;      // index of the tier being edited
+  var remoteVersion = 0;
+  var remoteReady = false;
+  var syncBusy = false;
+  var cloudNeedsInit = false;
+  var cloudConflict = false;
+  var draftBaseVersion = null;
+  var syncChannel = null;
+  var readGeneration = 0;
+  var activeReadController = null;
+  try { if ("BroadcastChannel" in window) syncChannel = new BroadcastChannel(CHANNEL_NAME); } catch (e) {}
 
   // ---------- helpers ----------
   var $ = function (id) { return document.getElementById(id); };
@@ -1107,6 +1135,26 @@
     t.className = "toast on " + (kind === "err" ? "err" : "ok");
     clearTimeout(toastTimer);
     toastTimer = setTimeout(function () { t.className = "toast"; }, 2800);
+  }
+
+  function setSyncStatus(state, message) {
+    var el = $("syncStatus");
+    el.setAttribute("data-state", state);
+    el.querySelector("span").textContent = message;
+  }
+
+  function getSyncToken(ask) {
+    var token = "";
+    try { token = sessionStorage.getItem(TOKEN_KEY) || ""; } catch (e) {}
+    if (!token && ask) {
+      token = String(window.prompt("请输入 Lucky 运营后台同步密钥。密钥只保存在当前标签页会话中。", "") || "").trim();
+      if (token) try { sessionStorage.setItem(TOKEN_KEY, token); } catch (e) {}
+    }
+    return token;
+  }
+
+  function clearSyncToken() {
+    try { sessionStorage.removeItem(TOKEN_KEY); } catch (e) {}
   }
 
   // ---------- validation / normalisation ----------
@@ -1364,7 +1412,7 @@
       var input = cell.querySelector("input");
       input.onchange = function () {
         var n = Number(input.value);
-        if (!isFinite(n) || n < 0) { toast("概率必须是 0 以上的数字", "err"); renderAll(); return; }
+        if (!isFinite(n) || n < 0 || n > 100) { toast("概率必须在 0 – 100 之间", "err"); renderAll(); return; }
         cfg.odds[k[0]] = n / 100;
         touch(); renderAll();
       };
@@ -1544,11 +1592,16 @@
 
   // ---------- dirty / persist ----------
   function touch() { renderDirty(); }
+  function isDirty() { return JSON.stringify(stripMeta(cfg)) !== JSON.stringify(stripMeta(saved)); }
   function renderDirty() {
-    var d = JSON.stringify(stripMeta(cfg)) !== JSON.stringify(stripMeta(saved));
+    var d = isDirty();
+    if (d && remoteReady && draftBaseVersion === null && !cloudConflict) draftBaseVersion = remoteVersion;
+    var canPublish = d || cloudNeedsInit;
     $("dirty").className = "dirty" + (d ? " on" : "");
-    $("btnSave").disabled = !d;
-    $("moSave").disabled = !d;
+    $("btnSave").disabled = !canPublish || syncBusy || !remoteReady;
+    $("moSave").disabled = !canPublish || syncBusy || !remoteReady;
+    $("btnSave").textContent = cloudConflict ? "解决云端冲突" : "保存并应用";
+    $("moSave").textContent = cloudConflict ? "解决冲突" : "保存并应用";
   }
   function stripMeta(c) { var x = clone(c); delete x.updatedAt; return x; }
 
@@ -1561,26 +1614,223 @@
       cfg = defaultConfig();
     }
     saved = clone(cfg);
+    var draft = null;
+    try { draft = localStorage.getItem(DRAFT_KEY); } catch (e) {}
+    if (draft) {
+      try {
+        cfg = sanitise(JSON.parse(draft));
+        var draftVersion = Number(localStorage.getItem(DRAFT_VERSION_KEY));
+        if (Number.isSafeInteger(draftVersion) && draftVersion >= 0) draftBaseVersion = draftVersion;
+      } catch (e) {
+        try { localStorage.removeItem(DRAFT_KEY); localStorage.removeItem(DRAFT_VERSION_KEY); } catch (ignore) {}
+      }
+    }
   }
 
-  $("btnSave").onclick = function () {
+  async function loadRemote(quiet) {
+    if (syncBusy) return;
+    var generation = ++readGeneration;
+    if (activeReadController) activeReadController.abort();
+    if (!quiet) setSyncStatus("loading", "正在连接云端");
+    var controller = "AbortController" in window ? new AbortController() : null;
+    activeReadController = controller;
+    var requestTimeout = window.setTimeout(function () { if (controller) controller.abort(); }, 6000);
+    try {
+      var fetchOptions = { cache: "no-store", headers: { "accept": "application/json" } };
+      if (controller) fetchOptions.signal = controller.signal;
+      var response = await fetch(CONFIG_API, fetchOptions);
+      if (!response.ok) throw new Error("HTTP " + response.status);
+      var payload = await response.json();
+      if (generation !== readGeneration) return;
+      var nextVersion = Number(payload.version || 0);
+      if (!Number.isSafeInteger(nextVersion) || nextVersion < 0) throw new Error("Invalid cloud version");
+      if (remoteReady && nextVersion < remoteVersion) return;
+      var hadDirtyDraft = isDirty();
+
+      if (payload.config) {
+        var cloudConfig = sanitise(payload.config);
+        cloudConfig.updatedAt = Number(payload.updatedAt || cloudConfig.updatedAt || 0);
+        if (!hadDirtyDraft) {
+          remoteVersion = nextVersion;
+          cloudNeedsInit = false;
+          cloudConflict = false;
+          draftBaseVersion = null;
+          cfg = cloudConfig;
+          saved = clone(cfg);
+          active = Math.min(active, cfg.tiers.length - 1);
+          try {
+            localStorage.setItem(CONFIG_VERSION_KEY, String(remoteVersion));
+            localStorage.setItem(CONFIG_KEY, JSON.stringify(cfg));
+          } catch (e) {}
+          renderAll();
+          setSyncStatus("synced", "云端已同步 · v" + remoteVersion);
+        } else {
+          try {
+            localStorage.setItem(CONFIG_VERSION_KEY, String(nextVersion));
+            localStorage.setItem(CONFIG_KEY, JSON.stringify(cloudConfig));
+          } catch (e) {}
+          var draftIsPublished = JSON.stringify(stripMeta(cfg)) === JSON.stringify(stripMeta(cloudConfig));
+          if (draftIsPublished) {
+            cfg = cloudConfig;
+            saved = clone(cloudConfig);
+            remoteVersion = nextVersion;
+            cloudNeedsInit = false;
+            cloudConflict = false;
+            draftBaseVersion = null;
+            try { localStorage.removeItem(DRAFT_KEY); localStorage.removeItem(DRAFT_VERSION_KEY); } catch (e) {}
+            renderAll();
+            setSyncStatus("synced", "云端已同步 · v" + remoteVersion);
+          } else {
+            var draftMatchesCloudBase = JSON.stringify(stripMeta(saved)) === JSON.stringify(stripMeta(cloudConfig));
+            if (draftBaseVersion === null && draftMatchesCloudBase) draftBaseVersion = nextVersion;
+            remoteVersion = nextVersion;
+            cloudNeedsInit = false;
+            cloudConflict = draftBaseVersion !== nextVersion;
+            setSyncStatus(cloudConflict ? "error" : "synced", cloudConflict ? "云端有新版本 · 草稿已锁定" : "云端已连接 · 本地有草稿");
+          }
+        }
+      } else {
+        remoteVersion = 0;
+        cloudNeedsInit = true;
+        if (hadDirtyDraft && draftBaseVersion === null) draftBaseVersion = 0;
+        cloudConflict = hadDirtyDraft && draftBaseVersion !== 0;
+        setSyncStatus(cloudConflict ? "error" : "synced", cloudConflict ? "云端状态已变化 · 草稿已锁定" : "云端待初始化");
+      }
+      remoteReady = true;
+    } catch (e) {
+      if (generation === readGeneration) {
+        remoteReady = true;
+        setSyncStatus("error", "云端暂时离线 · 使用本地副本");
+        if (!quiet) toast("无法读取云端配置，已载入浏览器副本", "err");
+      }
+    } finally {
+      window.clearTimeout(requestTimeout);
+      if (generation === readGeneration) {
+        activeReadController = null;
+        renderDirty();
+      }
+    }
+  }
+
+  $("btnSave").onclick = async function () {
+    if (cloudConflict) {
+      if (window.confirm("云端已有更新，本机草稿不能直接覆盖。是否放弃本机草稿并载入最新云端配置？")) {
+        try { localStorage.removeItem(DRAFT_KEY); localStorage.removeItem(DRAFT_VERSION_KEY); } catch (e) {}
+        window.location.reload();
+      }
+      return;
+    }
     var sum = cfg.odds.m0 + cfg.odds.m1 + cfg.odds.m2 + cfg.odds.m3;
     if (sum <= 0) { toast("中奖概率不能全为 0", "err"); return; }
+    if ([cfg.odds.m0, cfg.odds.m1, cfg.odds.m2, cfg.odds.m3].some(function (v) { return v < 0 || v > 1; })) {
+      toast("每项中奖概率必须在 0 – 100% 之间", "err"); return;
+    }
     var bad = cfg.tiers.filter(function (t) { return !t.prizePool.length || !t.multipliers.length || t.cost <= 0; });
     if (bad.length) { toast("有票种的奖金池 / 倍数池为空或票价无效", "err"); return; }
     cfg.updatedAt = Date.now();
+    var expectedVersion = draftBaseVersion === null ? remoteVersion : draftBaseVersion;
     try {
-      localStorage.setItem(CONFIG_KEY, JSON.stringify(cfg));
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(cfg));
+      localStorage.setItem(DRAFT_VERSION_KEY, String(expectedVersion));
     } catch (e) {
-      toast("保存失败：浏览器拒绝写入本地存储", "err");
+      toast("浏览器无法保留离线副本，将继续尝试云端同步", "err");
+    }
+    var token = getSyncToken(true);
+    if (!token) {
+      setSyncStatus("error", "需要同步密钥");
+      toast("未输入同步密钥，配置尚未发布", "err");
+      renderDirty();
       return;
     }
-    saved = clone(cfg);
+
+    syncBusy = true;
+    readGeneration += 1;
+    if (activeReadController) activeReadController.abort();
+    activeReadController = null;
+    setSyncStatus("loading", "正在发布到云端");
     renderDirty();
-    toast("已保存并应用 — 刷新游戏页面即可生效");
+    var submittedConfig = clone(cfg);
+    var saveController = "AbortController" in window ? new AbortController() : null;
+    var saveTimeout = window.setTimeout(function () { if (saveController) saveController.abort(); }, 10000);
+    var reconcileAfterSave = false;
+    try {
+      var saveOptions = {
+        method: "PUT",
+        headers: {
+          "accept": "application/json",
+          "content-type": "application/json",
+          "authorization": "Bearer " + token
+        },
+        body: JSON.stringify({ config: submittedConfig, expectedVersion: expectedVersion })
+      };
+      if (saveController) saveOptions.signal = saveController.signal;
+      var response = await fetch(CONFIG_API, saveOptions);
+      var payload = null;
+      try { payload = await response.json(); } catch (e) {}
+      if (!response.ok) {
+        if (response.status === 401) {
+          clearSyncToken();
+          setSyncStatus("error", "同步密钥无效");
+          toast("同步密钥不正确，请重新输入", "err");
+        } else if (response.status === 409) {
+          cloudConflict = true;
+          setSyncStatus("error", "云端已被修改 · 请刷新");
+          toast("另一台后台已发布新配置。请刷新页面核对后再保存。", "err");
+        } else {
+          setSyncStatus("error", "发布失败 · 本地草稿已保留");
+          toast(payload && payload.error ? payload.error : "云端发布失败（" + response.status + "）", "err");
+        }
+        return;
+      }
+
+      var publishedConfig = sanitise(payload.config);
+      publishedConfig.updatedAt = Number(payload.updatedAt || Date.now());
+      var editedDuringPublish = JSON.stringify(stripMeta(cfg)) !== JSON.stringify(stripMeta(submittedConfig));
+      remoteVersion = Number(payload.version);
+      cloudNeedsInit = false;
+      cloudConflict = false;
+      saved = clone(publishedConfig);
+      if (editedDuringPublish) draftBaseVersion = remoteVersion;
+      else { cfg = publishedConfig; draftBaseVersion = null; }
+      try {
+        localStorage.setItem(CONFIG_VERSION_KEY, String(remoteVersion));
+        localStorage.setItem(CONFIG_KEY, JSON.stringify(publishedConfig));
+        if (editedDuringPublish) {
+          localStorage.setItem(DRAFT_KEY, JSON.stringify(cfg));
+          localStorage.setItem(DRAFT_VERSION_KEY, String(draftBaseVersion));
+        } else {
+          localStorage.removeItem(DRAFT_KEY);
+          localStorage.removeItem(DRAFT_VERSION_KEY);
+        }
+      } catch (e) {}
+      if (syncChannel) syncChannel.postMessage({ type: "config-updated", version: remoteVersion });
+      setSyncStatus("synced", editedDuringPublish ? "已发布 · 另有新草稿" : "云端已同步 · v" + remoteVersion);
+      renderAll();
+      toast(editedDuringPublish ? "提交时的新编辑已保留为下一份草稿" : "已同步到所有设备 — 游戏会自动获取新配置");
+    } catch (e) {
+      reconcileAfterSave = true;
+      try {
+        localStorage.setItem(DRAFT_KEY, JSON.stringify(cfg));
+        localStorage.setItem(DRAFT_VERSION_KEY, String(expectedVersion));
+      } catch (ignore) {}
+      setSyncStatus("error", "网络中断 · 本地草稿已保留");
+      toast("网络中断，配置已保留在本机但尚未发布", "err");
+    } finally {
+      window.clearTimeout(saveTimeout);
+      syncBusy = false;
+      renderDirty();
+      if (reconcileAfterSave) window.setTimeout(function () { loadRemote(true); }, 0);
+    }
   };
 
   $("moSave").onclick = function () { $("btnSave").click(); };
+
+  $("btnSyncKey").onclick = function () {
+    var token = String(window.prompt("输入新的 Lucky 运营后台同步密钥。密钥只保存在当前标签页会话中。", "") || "").trim();
+    if (!token) return;
+    try { sessionStorage.setItem(TOKEN_KEY, token); } catch (e) {}
+    toast("同步密钥已更新；下次保存时会验证");
+  };
 
   $("btnExport").onclick = function () {
     var payload = clone(cfg);
@@ -1688,7 +1938,7 @@
   };
 
   window.addEventListener("beforeunload", function (e) {
-    if (!$("btnSave").disabled) { e.preventDefault(); e.returnValue = ""; }
+    if (isDirty()) { e.preventDefault(); e.returnValue = ""; }
   });
 
   document.addEventListener("keydown", function (e) {
@@ -1714,6 +1964,9 @@
 
   load();
   renderAll();
+  loadRemote(false);
+  window.setInterval(function () { if (!document.hidden && !isDirty()) loadRemote(true); }, 30000);
+  window.addEventListener("focus", function () { if (!isDirty()) loadRemote(true); });
 })();
 </script>
 </body>
