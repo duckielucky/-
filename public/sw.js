@@ -1,4 +1,4 @@
-const CACHE = "lucky-scratch-v9";
+const CACHE = "lucky-scratch-v10";
 const CORE = ["/", "/login.html", "/profile.html", "/lucky-account.css", "/lucky-account.js", "/lottery-background.webp", "/game-lottery-background.webp", "/profile-lottery-background.webp", "/manifest.webmanifest", "/favicon.svg"];
 
 function canonicalPathname(pathname) {
@@ -29,8 +29,10 @@ self.addEventListener("fetch", (event) => {
     pathname === null ||
     pathname.startsWith("/api/") ||
     pathname === "/manager" ||
+    pathname === "/manager/" ||
     pathname === "/manager.html" ||
     pathname === "/manager-login" ||
+    pathname === "/manager-login/" ||
     pathname === "/manager-login.html"
   ) return;
   event.respondWith(fetch(event.request).then((response) => {
