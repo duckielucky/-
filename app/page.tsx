@@ -21,6 +21,7 @@ type Cell = { number: number; prize: number; multiplier: number; instant?: boole
 type Ticket = {
   id: string;
   typeId: string;
+  typeSnapshot?: TicketType;
   winning: number[];
   cells: Cell[];
   scratched: boolean[];
@@ -81,17 +82,20 @@ const TICKET_TYPES: TicketType[] = [
 ];
 
 const CONFIG_KEY = "lucky_config_v1";
+const CONFIG_VERSION_KEY = "lucky_config_version_v1";
+const CONFIG_API = "/api/config";
+const CONFIG_CHANNEL = "lucky-config";
+let acceptedCloudConfigVersion = -1;
+let cloudConfigRequestSequence = 0;
 type Odds = { m0: number; m1: number; m2: number; m3: number };
 type GameConfig = { types: TicketType[]; odds: Odds; multiplierMinLevel: number };
 const DEFAULT_ODDS: Odds = { m0: 0.45, m1: 0.33, m2: 0.16, m3: 0.06 };
 const DEFAULT_CONFIG: GameConfig = { types: TICKET_TYPES, odds: DEFAULT_ODDS, multiplierMinLevel: 3 };
 
-/** Reads the operator config written by /manager.html. Any bad field falls back to the built-in default. */
-function loadConfig(): GameConfig {
+/** Converts the operator document into the runtime shape. Any bad field falls back to the built-in default. */
+function normaliseConfig(value: unknown): GameConfig {
   try {
-    const raw = localStorage.getItem(CONFIG_KEY);
-    if (!raw) return DEFAULT_CONFIG;
-    const parsed = JSON.parse(raw) as Partial<{ tiers: unknown[]; odds: Partial<Odds>; multiplierMinLevel: number }>;
+    const parsed = (value || {}) as Partial<{ tiers: unknown[]; odds: Partial<Odds>; multiplierMinLevel: number }>;
     const positives = (value: unknown, min: number) =>
       Array.isArray(value) ? value.map(Number).filter((entry) => Number.isFinite(entry) && entry >= min) : [];
 
@@ -134,6 +138,48 @@ function loadConfig(): GameConfig {
   } catch {
     return DEFAULT_CONFIG;
   }
+}
+
+/** Reads the last-known cloud configuration cached by the manager/game. */
+function loadConfig(): GameConfig {
+  try {
+    const raw = localStorage.getItem(CONFIG_KEY);
+    return raw ? normaliseConfig(JSON.parse(raw)) : DEFAULT_CONFIG;
+  } catch {
+    return DEFAULT_CONFIG;
+  }
+}
+
+/** Cloud config is authoritative; a cached copy keeps the game playable offline. */
+async function fetchCloudConfig(): Promise<GameConfig | null> {
+  const requestSequence = ++cloudConfigRequestSequence;
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), 5000);
+  try {
+    const response = await fetch(CONFIG_API, { cache: "no-store", headers: { accept: "application/json" }, signal: controller.signal });
+    if (!response.ok || !(response.headers.get("content-type") || "").includes("application/json")) return null;
+    const payload = await response.json() as { config?: unknown; version?: unknown };
+    if (!payload.config) return null;
+    const version = Number(payload.version);
+    if (!Number.isSafeInteger(version) || version < 0) return null;
+    if (requestSequence !== cloudConfigRequestSequence || version < acceptedCloudConfigVersion) return null;
+    acceptedCloudConfigVersion = version;
+    const next = normaliseConfig(payload.config);
+    try {
+      localStorage.setItem(CONFIG_VERSION_KEY, String(version));
+      localStorage.setItem(CONFIG_KEY, JSON.stringify(payload.config));
+    } catch { /* cache unavailable */ }
+    return next;
+  } catch {
+    return null;
+  } finally {
+    window.clearTimeout(timeout);
+  }
+}
+
+async function resolveStartupConfig(): Promise<GameConfig> {
+  const cached = loadConfig();
+  return (await fetchCloudConfig()) || cached;
 }
 
 const DEFAULT_PLAYER: Player = {
@@ -212,6 +258,7 @@ function buildTicket(type: TicketType, tutorial = false, playerLevel = 1, odds: 
   return {
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     typeId: type.id,
+    typeSnapshot: { ...type, prizePool: [...type.prizePool], multipliers: [...type.multipliers] },
     winning,
     cells,
     scratched: Array(16).fill(false),
@@ -593,12 +640,14 @@ export default function Home() {
   }, [cheat, devArmed]);
 
   useEffect(() => {
-    const hydrationTask = window.setTimeout(() => {
+    let cancelled = false;
+    const hydrate = async () => {
       if (!hasLocalAccountSession()) {
         window.location.replace("/login.html?next=%2F");
         return;
       }
-      const startup = loadConfig();
+      const startup = await resolveStartupConfig();
+      if (cancelled) return;
       setConfig(startup);
       const saveKey = gameSaveKey();
       saveKeyRef.current = saveKey;
@@ -607,10 +656,14 @@ export default function Home() {
         if (saved) {
           const parsed = JSON.parse(saved) as { player: Player; ticket: Ticket | null };
           const mergedPlayer = { ...DEFAULT_PLAYER, ...parsed.player, settings: { ...DEFAULT_PLAYER.settings, ...parsed.player?.settings } };
+          const legacyType = startup.types.find((type) => type.id === parsed.ticket?.typeId) || startup.types[0];
+          const restoredTicket = parsed.ticket
+            ? { ...parsed.ticket, typeSnapshot: parsed.ticket.typeSnapshot || { ...legacyType, prizePool: [...legacyType.prizePool], multipliers: [...legacyType.multipliers] } }
+            : null;
           setPlayer(mergedPlayer);
-          setTicket(parsed.ticket || null);
-          settleLock.current = Boolean(parsed.ticket?.settled);
-          setShowResult(Boolean(parsed.ticket?.settled));
+          setTicket(restoredTicket);
+          settleLock.current = Boolean(restoredTicket?.settled);
+          setShowResult(Boolean(restoredTicket?.settled));
         } else {
           const first = buildTicket(startup.types[0], true, 1, startup.odds, startup.multiplierMinLevel);
           setPlayer({ ...DEFAULT_PLAYER, coins: DEFAULT_PLAYER.coins - startup.types[0].cost, ticketsPlayed: 1, totalSpent: startup.types[0].cost, log: [{ t: Date.now(), k: "buy", a: startup.types[0].cost, n: startup.types[0].name }] });
@@ -622,10 +675,65 @@ export default function Home() {
         setTicket(first);
       }
       setHydrated(true);
-    }, 0);
+    };
+    const hydrationTask = window.setTimeout(() => { void hydrate(); }, 0);
     if (process.env.NODE_ENV === "production" && "serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => undefined);
-    return () => window.clearTimeout(hydrationTask);
+    return () => { cancelled = true; window.clearTimeout(hydrationTask); };
   }, []);
+
+  // Keep operator settings current across devices. Existing ticket cells are
+  // immutable; refreshed settings are used for the shop and all new tickets.
+  useEffect(() => {
+    if (!hydrated) return;
+    let disposed = false;
+    let refreshing = false;
+    const apply = (next: GameConfig | null) => {
+      if (!next || disposed) return;
+      setConfig((current) => JSON.stringify(current) === JSON.stringify(next) ? current : next);
+    };
+    const refresh = async () => {
+      if (refreshing || disposed) return;
+      refreshing = true;
+      apply(await fetchCloudConfig());
+      refreshing = false;
+    };
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === CONFIG_VERSION_KEY && event.newValue) {
+        const version = Number(event.newValue);
+        if (Number.isSafeInteger(version)) acceptedCloudConfigVersion = Math.max(acceptedCloudConfigVersion, version);
+      }
+      if (event.key === CONFIG_KEY && event.newValue) {
+        const version = Number(localStorage.getItem(CONFIG_VERSION_KEY));
+        if (Number.isSafeInteger(version)) acceptedCloudConfigVersion = Math.max(acceptedCloudConfigVersion, version);
+        apply(loadConfig());
+      }
+    };
+    const onFocus = () => { void refresh(); };
+    const onVisibility = () => { if (!document.hidden) void refresh(); };
+    let channel: BroadcastChannel | null = null;
+    try {
+      if ("BroadcastChannel" in window) {
+        channel = new BroadcastChannel(CONFIG_CHANNEL);
+        channel.onmessage = (event: MessageEvent<{ version?: unknown }>) => {
+          const version = Number(event.data?.version);
+          if (Number.isSafeInteger(version)) acceptedCloudConfigVersion = Math.max(acceptedCloudConfigVersion, version);
+          void refresh();
+        };
+      }
+    } catch { /* unsupported browser */ }
+    const interval = window.setInterval(() => { if (!document.hidden) void refresh(); }, 30000);
+    window.addEventListener("storage", onStorage);
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      disposed = true;
+      window.clearInterval(interval);
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibility);
+      channel?.close();
+    };
+  }, [hydrated]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -638,7 +746,7 @@ export default function Home() {
     return () => window.clearTimeout(timeout);
   }, [toast]);
 
-  const ticketType = config.types.find((type) => type.id === ticket?.typeId) || config.types[0];
+  const ticketType = ticket?.typeSnapshot || config.types.find((type) => type.id === ticket?.typeId) || config.types[0];
   const selectedType = config.types.find((type) => type.id === player.selectedTicketId) || config.types[0];
   const scratchedCount = ticket?.scratched.filter(Boolean).length || 0;
   const progressInLevel = player.ticketsPlayed % 5;
