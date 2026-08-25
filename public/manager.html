@@ -25,6 +25,25 @@
     background:var(--bg);-webkit-font-smoothing:antialiased;
     font-size:14px;line-height:1.7;
   }
+  body.auth-checking > :not(.auth-gate){visibility:hidden}
+  .auth-gate{
+    position:fixed;inset:0;z-index:100;display:grid;place-items:center;padding:24px;
+    background:var(--bg);color:var(--ink);text-align:center;
+  }
+  body:not(.auth-checking) .auth-gate{display:none}
+  .auth-gate-card{
+    width:min(100%,360px);padding:28px;border:1px solid var(--line);border-radius:18px;
+    background:var(--panel);box-shadow:0 18px 60px rgba(0,0,0,.12);
+  }
+  .auth-gate-mark{
+    width:42px;height:42px;margin:0 auto 14px;display:grid;place-items:center;border-radius:12px;
+    background:var(--signal);color:#fff;font-size:19px;font-weight:700;
+  }
+  .auth-gate h2{margin:0;font-size:18px;letter-spacing:-.02em}
+  .auth-gate p{margin:7px 0 18px;color:var(--muted);font-size:13px}
+  .auth-gate-actions{display:none;justify-content:center;gap:8px}
+  .auth-gate[data-state="error"] .auth-gate-actions{display:flex}
+  .auth-gate[data-state="error"] .auth-gate-mark{background:var(--danger)}
   body::before{
     content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
     background-image:
@@ -710,7 +729,19 @@
   :root[data-theme="dark"] .mobar{background:rgba(28,28,30,.82)}
 </style>
 </head>
-<body>
+<body class="auth-checking">
+
+<div class="auth-gate" id="authGate" data-state="loading" role="status" aria-live="polite">
+  <div class="auth-gate-card">
+    <div class="auth-gate-mark" aria-hidden="true">✦</div>
+    <h2>正在验证后台会话</h2>
+    <p id="authGateMessage">请稍候，正在安全连接运营后台。</p>
+    <div class="auth-gate-actions">
+      <button class="btn btn-primary" id="authRetry" type="button">重试</button>
+      <a class="btn" href="/">返回游戏</a>
+    </div>
+  </div>
+</div>
 
 <header class="topbar">
   <div class="brand">
@@ -727,7 +758,7 @@
   <div class="actions">
     <button class="btn" id="btnExport">导出配置</button>
     <button class="btn" id="btnImport">导入配置</button>
-    <button class="btn" id="btnSyncKey" type="button">同步密钥</button>
+    <button class="btn" id="btnLogout" type="button">退出后台</button>
     <button class="btn btn-danger" id="btnReset">恢复默认</button>
     <button class="btn btn-primary" id="btnSave" disabled>保存并应用</button>
   </div>
@@ -850,7 +881,7 @@
 
     <p class="foot">
       点击<b>保存并应用</b>会把配置同步到 Cloudflare，所有设备上的游戏会自动获取新版本。
-      浏览器仍会在 <code>lucky_config_v1</code> 保留离线副本；同步密钥只保存在当前标签页会话中。
+      浏览器仍会在 <code>lucky_config_v1</code> 保留离线副本；后台登录在本次浏览器会话中保持有效。
     </p>
   </div>
 
@@ -936,12 +967,16 @@
 (function () {
   "use strict";
 
+  // Remove the retired client-readable master key from tabs that used the old manager.
+  try { sessionStorage.removeItem("lucky_manager_token_v1"); } catch (e) {}
+
   var CONFIG_KEY = "lucky_config_v1";
   var CONFIG_VERSION_KEY = "lucky_config_version_v1";
   var DRAFT_KEY = "lucky_config_draft_v1";
   var DRAFT_VERSION_KEY = "lucky_config_draft_base_v1";
   var CONFIG_API = "/api/config";
-  var TOKEN_KEY = "lucky_manager_token_v1";
+  var SESSION_API = "/api/manager/session";
+  var LOGIN_URL = "/manager-login.html?next=%2Fmanager.html";
   var CHANNEL_NAME = "lucky-config";
   var SCHEMA_VERSION = 1;
 
@@ -981,6 +1016,7 @@
   var syncChannel = null;
   var readGeneration = 0;
   var activeReadController = null;
+  var authNavigationInProgress = false;
   try { if ("BroadcastChannel" in window) syncChannel = new BroadcastChannel(CHANNEL_NAME); } catch (e) {}
 
   // ---------- helpers ----------
@@ -1141,20 +1177,6 @@
     var el = $("syncStatus");
     el.setAttribute("data-state", state);
     el.querySelector("span").textContent = message;
-  }
-
-  function getSyncToken(ask) {
-    var token = "";
-    try { token = sessionStorage.getItem(TOKEN_KEY) || ""; } catch (e) {}
-    if (!token && ask) {
-      token = String(window.prompt("请输入 Lucky 运营后台同步密钥。密钥只保存在当前标签页会话中。", "") || "").trim();
-      if (token) try { sessionStorage.setItem(TOKEN_KEY, token); } catch (e) {}
-    }
-    return token;
-  }
-
-  function clearSyncToken() {
-    try { sessionStorage.removeItem(TOKEN_KEY); } catch (e) {}
   }
 
   // ---------- validation / normalisation ----------
@@ -1605,6 +1627,24 @@
   }
   function stripMeta(c) { var x = clone(c); delete x.updatedAt; return x; }
 
+  function persistDraft() {
+    if (!cfg) return false;
+    var baseVersion = draftBaseVersion === null ? remoteVersion : draftBaseVersion;
+    try {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(cfg));
+      localStorage.setItem(DRAFT_VERSION_KEY, String(baseVersion));
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function redirectToLogin(keepDraft) {
+    if (keepDraft) persistDraft();
+    authNavigationInProgress = true;
+    window.location.replace(LOGIN_URL);
+  }
+
   function load() {
     var raw = null;
     try { raw = localStorage.getItem(CONFIG_KEY); } catch (e) { /* private mode */ }
@@ -1639,6 +1679,7 @@
       var fetchOptions = { cache: "no-store", headers: { "accept": "application/json" } };
       if (controller) fetchOptions.signal = controller.signal;
       var response = await fetch(CONFIG_API, fetchOptions);
+      if (response.status === 401) { redirectToLogin(isDirty()); return; }
       if (!response.ok) throw new Error("HTTP " + response.status);
       var payload = await response.json();
       if (generation !== readGeneration) return;
@@ -1735,14 +1776,6 @@
     } catch (e) {
       toast("浏览器无法保留离线副本，将继续尝试云端同步", "err");
     }
-    var token = getSyncToken(true);
-    if (!token) {
-      setSyncStatus("error", "需要同步密钥");
-      toast("未输入同步密钥，配置尚未发布", "err");
-      renderDirty();
-      return;
-    }
-
     syncBusy = true;
     readGeneration += 1;
     if (activeReadController) activeReadController.abort();
@@ -1756,10 +1789,10 @@
     try {
       var saveOptions = {
         method: "PUT",
+        credentials: "same-origin",
         headers: {
           "accept": "application/json",
-          "content-type": "application/json",
-          "authorization": "Bearer " + token
+          "content-type": "application/json"
         },
         body: JSON.stringify({ config: submittedConfig, expectedVersion: expectedVersion })
       };
@@ -1769,9 +1802,8 @@
       try { payload = await response.json(); } catch (e) {}
       if (!response.ok) {
         if (response.status === 401) {
-          clearSyncToken();
-          setSyncStatus("error", "同步密钥无效");
-          toast("同步密钥不正确，请重新输入", "err");
+          setSyncStatus("error", "登录已过期 · 正在返回登录页");
+          redirectToLogin(true);
         } else if (response.status === 409) {
           cloudConflict = true;
           setSyncStatus("error", "云端已被修改 · 请刷新");
@@ -1825,11 +1857,35 @@
 
   $("moSave").onclick = function () { $("btnSave").click(); };
 
-  $("btnSyncKey").onclick = function () {
-    var token = String(window.prompt("输入新的 Lucky 运营后台同步密钥。密钥只保存在当前标签页会话中。", "") || "").trim();
-    if (!token) return;
-    try { sessionStorage.setItem(TOKEN_KEY, token); } catch (e) {}
-    toast("同步密钥已更新；下次保存时会验证");
+  $("btnLogout").onclick = async function () {
+    if (syncBusy) { toast("请等待当前发布完成后再退出", "err"); return; }
+    if (isDirty() && !window.confirm("当前未发布的更改会保留为本机草稿。确定退出运营后台吗？")) return;
+    if (isDirty() && !persistDraft()) {
+      toast("无法保留本机草稿，请先导出配置再退出", "err");
+      return;
+    }
+
+    var button = $("btnLogout");
+    button.disabled = true;
+    button.textContent = "正在退出…";
+    try {
+      var response = await fetch(SESSION_API, {
+        method: "DELETE",
+        credentials: "same-origin",
+        cache: "no-store",
+        headers: { "accept": "application/json" }
+      });
+      if (response.ok || response.status === 401) {
+        redirectToLogin(false);
+        return;
+      }
+      toast("暂时无法退出，请稍后重试", "err");
+    } catch (e) {
+      toast("网络连接失败，请稍后重试", "err");
+    } finally {
+      button.disabled = false;
+      button.textContent = "退出后台";
+    }
   };
 
   $("btnExport").onclick = function () {
@@ -1938,7 +1994,7 @@
   };
 
   window.addEventListener("beforeunload", function (e) {
-    if (isDirty()) { e.preventDefault(); e.returnValue = ""; }
+    if (!authNavigationInProgress && isDirty()) { e.preventDefault(); e.returnValue = ""; }
   });
 
   document.addEventListener("keydown", function (e) {
@@ -1962,11 +2018,64 @@
     renderDirty();
   }
 
-  load();
-  renderAll();
-  loadRemote(false);
-  window.setInterval(function () { if (!document.hidden && !isDirty()) loadRemote(true); }, 30000);
-  window.addEventListener("focus", function () { if (!isDirty()) loadRemote(true); });
+  var managerStarted = false;
+  var sessionCheckBusy = false;
+
+  function setAuthGate(state, message) {
+    var gate = $("authGate");
+    gate.setAttribute("data-state", state);
+    $("authGateMessage").textContent = message;
+    gate.querySelector("h2").textContent = state === "error" ? "暂时无法进入后台" : "正在验证后台会话";
+  }
+
+  async function ensureManagerSession(initialCheck) {
+    if (sessionCheckBusy) return false;
+    sessionCheckBusy = true;
+    if (initialCheck) setAuthGate("loading", "请稍候，正在安全连接运营后台。");
+    try {
+      var response = await fetch(SESSION_API, {
+        method: "GET",
+        credentials: "same-origin",
+        cache: "no-store",
+        headers: { "accept": "application/json" }
+      });
+      if (response.status === 401) {
+        redirectToLogin(managerStarted && isDirty());
+        return false;
+      }
+      if (!response.ok) {
+        if (initialCheck) setAuthGate("error", "后台登录服务暂时不可用，请稍后重试。");
+        return false;
+      }
+      return true;
+    } catch (e) {
+      if (initialCheck) setAuthGate("error", "无法连接后台登录服务，请检查网络后重试。");
+      return false;
+    } finally {
+      sessionCheckBusy = false;
+    }
+  }
+
+  async function startManager() {
+    if (managerStarted) return;
+    document.body.classList.add("auth-checking");
+    if (!await ensureManagerSession(true)) return;
+    load();
+    renderAll();
+    managerStarted = true;
+    document.body.classList.remove("auth-checking");
+    loadRemote(false);
+    window.setInterval(function () { if (!document.hidden && !isDirty()) loadRemote(true); }, 30000);
+  }
+
+  $("authRetry").onclick = function () { void startManager(); };
+  window.addEventListener("focus", function () {
+    if (!managerStarted) return;
+    void ensureManagerSession(false).then(function (authenticated) {
+      if (authenticated && !isDirty()) loadRemote(true);
+    });
+  });
+  void startManager();
 })();
 </script>
 </body>

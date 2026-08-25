@@ -1,11 +1,17 @@
+import {
+  isManagerAuthConfigured,
+  strictSameOriginError,
+  verifyManagerSession,
+  type ManagerAuthEnv,
+} from "./manager-auth";
+
 const CONFIG_PATH = "/api/config";
 const CONFIG_KEY = "global";
 const MAX_BODY_BYTES = 96 * 1024;
 let schemaReady: Promise<void> | null = null;
 
-type ConfigEnv = {
+type ConfigEnv = ManagerAuthEnv & {
   DB?: D1Database;
-  MANAGER_TOKEN?: string;
 };
 
 type StoredConfigRow = {
@@ -146,21 +152,6 @@ function validateConfig(value: unknown, updatedAt: number): OperatorConfig {
   };
 }
 
-function secureEqual(left: string, right: string): boolean {
-  const encoder = new TextEncoder();
-  const a = encoder.encode(left);
-  const b = encoder.encode(right);
-  let mismatch = a.length ^ b.length;
-  const length = Math.max(a.length, b.length);
-  for (let index = 0; index < length; index += 1) mismatch |= (a[index % Math.max(a.length, 1)] || 0) ^ (b[index % Math.max(b.length, 1)] || 0);
-  return mismatch === 0;
-}
-
-function bearerToken(request: Request): string {
-  const match = /^Bearer\s+(.+)$/i.exec(request.headers.get("authorization") || "");
-  return match ? match[1] : "";
-}
-
 async function ensureTable(db: D1Database): Promise<void> {
   if (!schemaReady) {
     schemaReady = db.prepare(CREATE_TABLE).run().then(() => undefined).catch((cause) => {
@@ -194,14 +185,10 @@ async function getConfig(db: D1Database, request: Request): Promise<Response> {
 }
 
 async function putConfig(db: D1Database, request: Request, env: ConfigEnv): Promise<Response> {
-  const url = new URL(request.url);
-  const origin = request.headers.get("origin");
-  if (origin && origin !== url.origin) return error("Cross-origin manager writes are not allowed", 403);
-  const fetchSite = request.headers.get("sec-fetch-site");
-  if (fetchSite && fetchSite !== "same-origin" && fetchSite !== "none") return error("Cross-site manager writes are not allowed", 403);
-
-  if (!env.MANAGER_TOKEN) return error("Manager synchronization is not configured", 503);
-  if (!secureEqual(bearerToken(request), env.MANAGER_TOKEN)) return error("Manager key is invalid", 401);
+  const originError = strictSameOriginError(request);
+  if (originError) return originError;
+  if (!isManagerAuthConfigured(env)) return error("Manager authentication is not configured", 503);
+  if (!(await verifyManagerSession(request, env))) return error("Manager session is invalid or expired", 401);
   if (!(request.headers.get("content-type") || "").toLowerCase().includes("application/json")) {
     return error("Content-Type must be application/json", 415);
   }
