@@ -163,6 +163,9 @@ test("ships the game systems and installable assets", async () => {
   assert.match(serviceWorker, /caches\.open\(CACHE\)/);
   assert.match(serviceWorker, /pathname\.startsWith\("\/api\/"\)/);
   assert.match(serviceWorker, /canonicalPathname/);
+  assert.match(serviceWorker, /const CACHE = "lucky-scratch-v10"/);
+  assert.match(serviceWorker, /pathname === "\/manager\/"/);
+  assert.match(serviceWorker, /pathname === "\/manager-login\/"/);
   assert.match(serviceWorker, /pathname === "\/manager-login\.html"/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
   await access(new URL("../public/og.png", import.meta.url));
@@ -259,6 +262,23 @@ test("gates encoded manager aliases before static routing", async () => {
     const response = await apiFetch(db, path, { redirect: "manual" });
     assert.equal(response.status, 302, path);
     assert.match(response.headers.get("cache-control") ?? "", /no-store/i);
+  }
+});
+
+test("redirects authenticated manager aliases to the canonical manager page", async () => {
+  const db = createConfigDb();
+  const loggedIn = await managerLogin(db);
+  assert.equal(loggedIn.status, 200);
+  const { cookie } = readSessionCookie(loggedIn);
+
+  for (const path of ["/manager", "/manager/", "/manager%2Ehtml", "/%6danager.html"]) {
+    const response = await apiFetch(db, path, {
+      redirect: "manual",
+      headers: { cookie },
+    });
+    assert.equal(response.status, 302, path);
+    assert.equal(response.headers.get("location"), `${API_ORIGIN}/manager.html`, path);
+    assert.match(response.headers.get("cache-control") ?? "", /no-store/i, path);
   }
 });
 
