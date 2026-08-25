@@ -14,6 +14,7 @@ interface Env {
   ASSETS: Fetcher;
   DB?: D1Database;
   MANAGER_TOKEN?: string;
+  MANAGER_PASSWORD?: string;
   IMAGES: {
     input(stream: ReadableStream): {
       transform(options: Record<string, unknown>): {
