@@ -13,7 +13,9 @@ const localBindingConfig = {
   compatibility_flags: ["nodejs_compat"],
   assets: {
     binding: "ASSETS",
-    run_worker_first: true,
+    // Keep authentication/API routes in the Worker, while letting Cloudflare
+    // serve Vinext's hashed JavaScript and CSS directly from Static Assets.
+    run_worker_first: ["/api/*", "/manager*"],
   },
   d1_databases: d1
     ? [

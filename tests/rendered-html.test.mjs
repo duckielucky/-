@@ -108,6 +108,12 @@ test("server-renders Lucky Scratch metadata and app shell", async () => {
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape/i);
 });
 
+test("serves game bundles asset-first while keeping manager routes protected", async () => {
+  const wranglerConfig = JSON.parse(await readFile(new URL("../dist/server/wrangler.json", import.meta.url), "utf8"));
+  assert.equal(wranglerConfig.assets?.binding, "ASSETS");
+  assert.deepEqual(wranglerConfig.assets?.run_worker_first, ["/api/*", "/manager*"]);
+});
+
 test("ships the game systems and installable assets", async () => {
   const [page, layout, styles, accountStyles, login, profile, manager, managerLoginPage, manifest, serviceWorker, packageJson] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
