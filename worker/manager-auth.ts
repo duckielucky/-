@@ -6,6 +6,7 @@ const SESSION_TTL_SECONDS = 8 * 60 * 60;
 const LOGIN_BODY_LIMIT_BYTES = 4 * 1024;
 const MIN_MANAGER_TOKEN_BYTES = 32;
 const MAX_MANAGER_TOKEN_BYTES = 4 * 1024;
+const MIN_MANAGER_PASSWORD_BYTES = 8;
 const KEY_DERIVATION_CONTEXT = "Lucky manager session signing key\u0000v1";
 const SIGNATURE_CONTEXT = "Lucky manager session cookie\u0000v1\u0000";
 const encoder = new TextEncoder();
@@ -28,6 +29,7 @@ function canonicalPathname(pathname: string): string | null {
 
 export type ManagerAuthEnv = {
   MANAGER_TOKEN?: string;
+  MANAGER_PASSWORD?: string;
 };
 
 export type ManagerSession = {
@@ -65,8 +67,17 @@ function configuredManagerToken(env: ManagerAuthEnv): string | null {
     : null;
 }
 
+function configuredManagerPassword(env: ManagerAuthEnv): string | null {
+  if (env.MANAGER_PASSWORD === undefined) return configuredManagerToken(env);
+  if (typeof env.MANAGER_PASSWORD !== "string") return null;
+  const byteLength = encoder.encode(env.MANAGER_PASSWORD).byteLength;
+  return byteLength >= MIN_MANAGER_PASSWORD_BYTES && byteLength <= MAX_MANAGER_TOKEN_BYTES
+    ? env.MANAGER_PASSWORD
+    : null;
+}
+
 export function isManagerAuthConfigured(env: ManagerAuthEnv): boolean {
-  return configuredManagerToken(env) !== null;
+  return configuredManagerToken(env) !== null && configuredManagerPassword(env) !== null;
 }
 
 function bytesToBase64Url(bytes: Uint8Array): string {
@@ -295,7 +306,7 @@ export async function handleManagerAuthApi(request: Request, env: ManagerAuthEnv
   if (pathname !== MANAGER_SESSION_PATH) return null;
 
   if (request.method === "GET") {
-    if (!configuredManagerToken(env)) return authError("Manager authentication is not configured", 503);
+    if (!isManagerAuthConfigured(env)) return authError("Manager authentication is not configured", 503);
     const session = await verifyManagerSession(request, env);
     if (!session) {
       return authJson({ authenticated: false }, 401, { "set-cookie": expiredSessionCookie() });
@@ -307,10 +318,11 @@ export async function handleManagerAuthApi(request: Request, env: ManagerAuthEnv
     const originError = strictSameOriginError(request);
     if (originError) return originError;
     const managerToken = configuredManagerToken(env);
-    if (!managerToken) return authError("Manager authentication is not configured", 503);
+    const managerPassword = configuredManagerPassword(env);
+    if (!managerToken || !managerPassword) return authError("Manager authentication is not configured", 503);
     const candidate = await readLoginCredential(request);
     if (candidate === null) return authError("The login request is invalid", 400);
-    if (!(await managerTokenMatches(candidate, managerToken))) return authError("Manager credentials are invalid", 401);
+    if (!(await managerTokenMatches(candidate, managerPassword))) return authError("Manager credentials are invalid", 401);
     const { value, session } = await issueManagerSession(request, managerToken);
     return authJson(
       { authenticated: true, expiresAt: session.expiresAt },

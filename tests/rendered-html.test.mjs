@@ -3,7 +3,8 @@ import { access, readFile } from "node:fs/promises";
 import test from "node:test";
 
 const API_ORIGIN = "http://localhost";
-const MANAGER_PASSWORD = "unit-test-manager-password-2026-08-25";
+const MANAGER_PASSWORD = "Test1234";
+const MANAGER_SESSION_SECRET = "unit-test-manager-session-secret-2026-08-25";
 const MANAGER_COOKIE_NAME = "__Host-lucky-manager-session";
 
 async function render() {
@@ -48,13 +49,19 @@ function createConfigDb() {
   };
 }
 
-async function apiFetch(db, path = "/api/config", init = {}) {
+async function apiFetch(db, path = "/api/config", init = {}, envOverrides = {}) {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
   workerUrl.searchParams.set("api-test", `${process.pid}-${Date.now()}-${Math.random()}`);
   const { default: worker } = await import(workerUrl.href);
   return worker.fetch(
     new Request(`${API_ORIGIN}${path}`, init),
-    { DB: db, MANAGER_TOKEN: MANAGER_PASSWORD, ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } },
+    {
+      DB: db,
+      MANAGER_TOKEN: MANAGER_SESSION_SECRET,
+      MANAGER_PASSWORD,
+      ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) },
+      ...envOverrides,
+    },
     { waitUntil() {}, passThroughOnException() {} },
   );
 }
@@ -193,7 +200,9 @@ test("creates, checks, and expires an HttpOnly signed manager session", async ()
   assert.match(setCookie, /; Secure/i);
   assert.match(setCookie, /; SameSite=Strict/i);
   assert.doesNotMatch(setCookie, new RegExp(MANAGER_PASSWORD));
+  assert.doesNotMatch(setCookie, new RegExp(MANAGER_SESSION_SECRET));
   assert.doesNotMatch(JSON.stringify(loggedInBody), new RegExp(MANAGER_PASSWORD));
+  assert.doesNotMatch(JSON.stringify(loggedInBody), new RegExp(MANAGER_SESSION_SECRET));
 
   const session = await apiFetch(db, "/api/manager/session", { headers: { cookie } });
   assert.equal(session.status, 200);
@@ -218,6 +227,30 @@ test("creates, checks, and expires an HttpOnly signed manager session", async ()
   assert.match(logoutCookie, /; HttpOnly/i);
   assert.match(logoutCookie, /; Secure/i);
   assert.match(logoutCookie, /; SameSite=Strict/i);
+});
+
+test("keeps a strong signing secret separate from the manager password", async () => {
+  const db = createConfigDb();
+  const shortSigningSecret = await apiFetch(db, "/api/manager/session", {
+    method: "POST",
+    headers: sameOriginHeaders({ "content-type": "application/json" }),
+    body: JSON.stringify({ password: MANAGER_PASSWORD }),
+  }, { MANAGER_TOKEN: "too-short" });
+  assert.equal(shortSigningSecret.status, 503);
+
+  const shortPassword = await apiFetch(db, "/api/manager/session", {
+    method: "POST",
+    headers: sameOriginHeaders({ "content-type": "application/json" }),
+    body: JSON.stringify({ password: "1234567" }),
+  }, { MANAGER_PASSWORD: "1234567" });
+  assert.equal(shortPassword.status, 503);
+
+  const legacyFallback = await apiFetch(db, "/api/manager/session", {
+    method: "POST",
+    headers: sameOriginHeaders({ "content-type": "application/json" }),
+    body: JSON.stringify({ password: MANAGER_SESSION_SECRET }),
+  }, { MANAGER_PASSWORD: undefined });
+  assert.equal(legacyFallback.status, 200);
 });
 
 test("gates encoded manager aliases before static routing", async () => {
