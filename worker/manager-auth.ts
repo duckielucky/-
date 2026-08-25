@@ -388,7 +388,7 @@ export async function handleManagerPageGate(request: Request, env: ManagerAuthEn
   if (managerPage && !session) {
     return securedPageResponse(Response.redirect(new URL(MANAGER_LOGIN_PATH, request.url), 302));
   }
-  if (managerPage && session && url.pathname !== pathname) {
+  if (managerPage && session && (pathname !== "/manager.html" || url.pathname !== pathname)) {
     return securedPageResponse(Response.redirect(new URL("/manager.html", request.url), 302));
   }
   if (loginPage && session) {
