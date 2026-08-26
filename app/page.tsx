@@ -579,7 +579,6 @@ export default function Home() {
   const [showResult, setShowResult] = useState(false);
   const [winFx, setWinFx] = useState<{ n: number; intensity: number }>({ n: 0, intensity: 0 });
   const [winFlash, setWinFlash] = useState<{ n: number; intensity: number }>({ n: 0, intensity: 0 });
-  const [today] = useState(() => new Date().toISOString().slice(0, 10));
   const [sessionNow] = useState(() => Date.now());
   const [profileAvatar, setProfileAvatar] = useState<string | null>(null);
   const [devArmed, setDevArmed] = useState(false);
@@ -663,7 +662,10 @@ export default function Home() {
           setPlayer(mergedPlayer);
           setTicket(restoredTicket);
           settleLock.current = Boolean(restoredTicket?.settled);
-          setShowResult(Boolean(restoredTicket?.settled));
+          // A settled ticket stays settled, but its result poster belongs only
+          // to the settlement that happened in this page session. Returning
+          // from Profile or refreshing must not replay an old result.
+          setShowResult(false);
         } else {
           const first = buildTicket(startup.types[0], true, 1, startup.odds, startup.multiplierMinLevel);
           setPlayer({ ...DEFAULT_PLAYER, coins: DEFAULT_PLAYER.coins - startup.types[0].cost, ticketsPlayed: 1, totalSpent: startup.types[0].cost, log: [{ t: Date.now(), k: "buy", a: startup.types[0].cost, n: startup.types[0].name }] });
@@ -750,7 +752,6 @@ export default function Home() {
   const selectedType = config.types.find((type) => type.id === player.selectedTicketId) || config.types[0];
   const scratchedCount = ticket?.scratched.filter(Boolean).length || 0;
   const progressInLevel = player.ticketsPlayed % 5;
-  const dailyAvailable = player.lastDaily !== today;
   const canRescue = player.coins < config.types[0].cost && sessionNow - player.rescueAt >= 6 * 60 * 60 * 1000;
   const prizeTier: "miss" | "normal" | "big" | "jackpot" = !ticket?.settled || ticket.totalWin <= 0
     ? "miss"
@@ -850,14 +851,6 @@ export default function Home() {
     else setToast(`${type.name} 已就绪，祝你好运！`);
   };
 
-  const claimDaily = () => {
-    if (!dailyAvailable) { setToast("今日奖励已领取"); return; }
-    const reward = randomFrom([1000, 1500, 2000, 2500, 3000]);
-    setPlayer((current) => ({ ...current, coins: current.coins + reward, lastDaily: today, log: pushLog(current.log, { t: Date.now(), k: "daily", a: reward }) }));
-    setToast(`每日奖励：+${formatCoins(reward)} 金币`);
-    playTone(player.settings.sound, "win"); vibrate([40, 40, 80]);
-  };
-
   const claimRescue = () => {
     if (!canRescue) return;
     setPlayer((current) => ({ ...current, coins: current.coins + 1500, rescueAt: Date.now(), log: pushLog(current.log, { t: Date.now(), k: "rescue", a: 1500 }) }));
@@ -924,9 +917,9 @@ export default function Home() {
       <div className="ambient-orb orb-one" /><div className="ambient-orb orb-two" />
       <section className="game-card" aria-label="Lucky Scratch game">
         <header className="top-stats">
-          <button className="stat-button" onClick={claimDaily} aria-label="领取每日奖励">
-            <span>{dailyAvailable ? "每日礼包" : "余额"}</span><strong><i className="coin-dot" />{formatCoins(player.coins)}</strong>
-          </button>
+          <div className="stat-display">
+            <span>余额</span><strong><i className="coin-dot" />{formatCoins(player.coins)}</strong>
+          </div>
           <button type="button" className="brand-mark brand-button" onClick={bumpBrandTap}>LUCKY<span>SCRATCH</span></button>
           <div className="top-actions">
             <button className="stat-button stat-right" onClick={() => setPanel("collection")} aria-label="打开收藏">
@@ -1060,8 +1053,7 @@ export default function Home() {
             {panel === "settings" && <div className="settings-list">
               <label htmlFor="sound-toggle"><span><b>音效</b><small>刮开、匹配与中奖反馈</small></span><input id="sound-toggle" aria-label="音效" type="checkbox" checked={player.settings.sound} onChange={(event) => setPlayer((current) => ({ ...current, settings: { ...current.settings, sound: event.target.checked } }))} /></label>
               <label htmlFor="vibration-toggle"><span><b>振动</b><small>支持的手机上轻微震动</small></span><input id="vibration-toggle" aria-label="振动" type="checkbox" checked={player.settings.vibration} onChange={(event) => setPlayer((current) => ({ ...current, settings: { ...current.settings, vibration: event.target.checked } }))} /></label>
-              <a className="daily-settings" href="/profile.html" style={{ textDecoration: "none" }}><span>账户与个人资料</span><b>打开</b></a>
-              <button className="daily-settings" disabled={!dailyAvailable} onClick={claimDaily}><span>每日奖励</span><b>{dailyAvailable ? "领取" : "已领取"}</b></button>
+              <a className="settings-row" href="/profile.html" style={{ textDecoration: "none" }}><span>账户与个人资料</span><b>打开</b></a>
               <button className="reset-button" onClick={resetSave}>重置全部进度</button>
               <p>幸运刮刮乐是仅使用虚拟金币的娱乐游戏，不涉及真实货币、提现或实物奖励。</p>
             </div>}
@@ -1080,7 +1072,7 @@ export default function Home() {
               <li><h4>中奖</h4><p>刮出的号码只要出现在<b>中奖号码</b>中即可获奖——带 <b>✦ 倍数</b>的格子还会成倍放大奖金。</p></li>
               <li><h4>完成刮卡</h4><p>至少刮开 <b>8 格</b>后点<b>兑奖</b>，或点<b>全部刮开</b>展开整张卡；买<b>新的一张</b>再玩一次。</p></li>
               <li><h4>升级</h4><p>每刮 <b>5 张</b>升一级，解锁更贵、奖金更高的票种。同一票种刮满 50 张可获得<b>金色收藏徽章</b>。</p></li>
-              <li><h4>金币不足？</h4><p>在设置中领取<b>每日奖励</b>，或在金币不足时领取<b>每日救济</b>。</p></li>
+              <li><h4>金币不足？</h4><p>余额低于最低票价时，可以领取<b>救济金币</b>继续游戏。</p></li>
             </ul>
             <p className="help-note">金币为虚拟货币，不可兑换现金或实物奖励。</p>
           </section>

@@ -188,6 +188,25 @@ test("ships the game systems and installable assets", async () => {
   await access(new URL("../public/profile-lottery-background.webp", import.meta.url));
 });
 
+test("restored settled tickets do not replay the result poster", async () => {
+  const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+  const hydrate = page.slice(page.indexOf("const hydrate = async"), page.indexOf("// Keep operator settings current"));
+  assert.match(hydrate, /settleLock\.current = Boolean\(restoredTicket\?\.settled\)/);
+  assert.doesNotMatch(hydrate, /setShowResult\(Boolean\(restoredTicket\?\.settled\)\)/);
+  assert.match(hydrate, /setShowResult\(false\)/);
+  assert.equal((page.match(/setShowResult\(true\)/g) ?? []).length, 1);
+});
+
+test("removes the daily reward claim while preserving legacy history support", async () => {
+  const [page, profile] = await Promise.all([
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../public/profile.html", import.meta.url), "utf8"),
+  ]);
+  assert.doesNotMatch(page, /\bclaimDaily\b|\bdailyAvailable\b|领取每日奖励|每日礼包|每日奖励/);
+  assert.match(page, /<div className="stat-display">\s*<span>余额<\/span>.*formatCoins\(player\.coins\)/s);
+  assert.match(profile, /daily:\s*\{[^}]*每日奖励/s);
+});
+
 test("creates, checks, and expires an HttpOnly signed manager session", async () => {
   const db = createConfigDb();
 
