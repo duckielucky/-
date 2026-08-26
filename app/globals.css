@@ -53,6 +53,10 @@ button { -webkit-tap-highlight-color: transparent; }
 .top-stats { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 10px; }
 .stat-button, .stat-display { min-width: 0; padding: 3px 0; border: 0; background: transparent; color: white; text-align: left; }
 .stat-button { cursor: pointer; }
+.stat-balance { border-radius: 8px; transition: transform .12s ease, filter .15s ease; }
+.stat-balance:hover { filter: brightness(1.18); }
+.stat-balance:active { transform: scale(.96); }
+.stat-balance:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
 .stat-right { text-align: right; }
 .stat-button > span, .stat-display > span { display: block; color: var(--muted); font-size: 8px; font-weight: 800; letter-spacing: .16em; }
 .stat-button strong, .stat-display strong { display: flex; align-items: center; gap: 5px; margin-top: 3px; font-size: 15px; }
@@ -166,6 +170,32 @@ button { -webkit-tap-highlight-color: transparent; }
 .ticket-copy > div b { color: var(--gold); }
 .ticket-option > button { min-width: 55px; padding: 8px 6px; border: 1px solid color-mix(in srgb, var(--option-accent) 55%, #5c4164); border-radius: 8px; background: color-mix(in srgb, var(--option-accent-2) 50%, #24122b); color: white; font-size: 6px; font-weight: 950; cursor: pointer; }
 .ticket-option > button:disabled { opacity: .55; cursor: not-allowed; }
+
+.topup-content { display: grid; gap: 12px; }
+.topup-notice { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; border: 1px solid #41e8d943; border-radius: 12px; background: #24d9c916; }
+.topup-notice b { flex: none; color: var(--cyan); font-size: 9px; }
+.topup-notice span { color: #b8aabe; font-size: 11px; line-height: 1.45; text-align: right; }
+.topup-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+.topup-grid > button { display: grid; min-height: 94px; padding: 13px 10px; border: 1px solid #ffffff18; border-radius: 15px; background: radial-gradient(circle at 50% 0, #9c43db25, transparent 65%), #ffffff07; color: white; text-align: left; cursor: pointer; transition: transform .12s ease, border-color .15s ease, background .15s ease; }
+.topup-grid > button:hover { border-color: #4effe86e; background-color: #ffffff0c; }
+.topup-grid > button:active { transform: scale(.97); }
+.topup-grid > button.selected { border-color: var(--cyan); background: linear-gradient(145deg, #29ddc826, #a33be621); box-shadow: inset 0 0 22px #24e4d112, 0 0 18px #24e4d11c; }
+.topup-grid span { color: #8c7b98; font-size: 6px; font-weight: 800; letter-spacing: .15em; text-transform: uppercase; }
+.topup-grid strong { margin: 5px 0; color: #f7ecff; font-size: 20px; letter-spacing: -.04em; }
+.topup-grid small { color: var(--gold); font-size: 8px; }
+.topup-grid > button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+.topup-confirm { padding: 13px; border: 1px solid #d884ff4a; border-radius: 14px; background: #b52eff12; }
+.topup-confirm p { margin: 0; color: #eadcf0; font-size: 11px; }
+.topup-confirm p b { color: var(--cyan); }
+.topup-confirm > small { display: block; margin-top: 5px; color: #b1a3b9; font-size: 10px; line-height: 1.5; }
+.topup-confirm > div { display: grid; grid-template-columns: .8fr 1.4fr; gap: 8px; margin-top: 11px; }
+.topup-confirm button { padding: 10px 8px; border: 1px solid #ffffff18; border-radius: 10px; background: #ffffff0a; color: #cdbfd4; font-size: 8px; font-weight: 900; cursor: pointer; }
+.topup-confirm button.confirm { border-color: #71fff0; background: linear-gradient(180deg, #4effe8, #22c6b7); color: #06231f; }
+.topup-empty { padding: 28px 12px; border: 1px dashed #ffffff1c; border-radius: 15px; color: #897b93; text-align: center; }
+.topup-empty span { display: block; color: #b27cc8; font-size: 25px; }
+.topup-empty b { display: block; margin-top: 7px; color: #c7b9cf; font-size: 10px; }
+.topup-empty p { margin: 4px 0 0; font-size: 7px; }
+.topup-footnote { margin: 0; color: #a396aa; font-size: 10px; line-height: 1.55; text-align: center; }
 
 .collection-hero { padding: 16px; border: 1px solid #ffffff16; border-radius: 16px; background: radial-gradient(circle at 50% 0, #8f2cc844, transparent 60%), #ffffff06; text-align: center; }
 .collection-hero > span { color: #e8b2ff; font-size: 7px; font-weight: 900; letter-spacing: .2em; }

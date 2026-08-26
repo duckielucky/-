@@ -17,6 +17,12 @@ type TicketType = {
   specialChance: number;
 };
 
+type TopupPackage = {
+  id: string;
+  price: number;
+  coins: number;
+};
+
 type Cell = { number: number; prize: number; multiplier: number; instant?: boolean };
 type Ticket = {
   id: string;
@@ -29,7 +35,7 @@ type Ticket = {
   totalWin: number;
   createdAt: number;
 };
-type LogEntry = { t: number; k: "buy" | "win" | "daily" | "rescue"; a: number; n?: string };
+type LogEntry = { t: number; k: "buy" | "win" | "daily" | "rescue" | "topup"; a: number; n?: string };
 type Player = {
   coins: number;
   level: number;
@@ -88,14 +94,20 @@ const CONFIG_CHANNEL = "lucky-config";
 let acceptedCloudConfigVersion = -1;
 let cloudConfigRequestSequence = 0;
 type Odds = { m0: number; m1: number; m2: number; m3: number };
-type GameConfig = { types: TicketType[]; odds: Odds; multiplierMinLevel: number };
+type GameConfig = { types: TicketType[]; odds: Odds; multiplierMinLevel: number; topups: TopupPackage[] };
 const DEFAULT_ODDS: Odds = { m0: 0.45, m1: 0.33, m2: 0.16, m3: 0.06 };
-const DEFAULT_CONFIG: GameConfig = { types: TICKET_TYPES, odds: DEFAULT_ODDS, multiplierMinLevel: 3 };
+const DEFAULT_TOPUPS: TopupPackage[] = [
+  { id: "starter", price: 4.9, coins: 5000 },
+  { id: "value", price: 9.9, coins: 12000 },
+  { id: "popular", price: 19.9, coins: 30000 },
+  { id: "mega", price: 49.9, coins: 80000 },
+];
+const DEFAULT_CONFIG: GameConfig = { types: TICKET_TYPES, odds: DEFAULT_ODDS, multiplierMinLevel: 3, topups: DEFAULT_TOPUPS };
 
 /** Converts the operator document into the runtime shape. Any bad field falls back to the built-in default. */
 function normaliseConfig(value: unknown): GameConfig {
   try {
-    const parsed = (value || {}) as Partial<{ tiers: unknown[]; odds: Partial<Odds>; multiplierMinLevel: number }>;
+    const parsed = (value || {}) as Partial<{ tiers: unknown[]; odds: Partial<Odds>; multiplierMinLevel: number; topups: unknown }>;
     const positives = (value: unknown, min: number) =>
       Array.isArray(value) ? value.map(Number).filter((entry) => Number.isFinite(entry) && entry >= min) : [];
 
@@ -134,7 +146,23 @@ function normaliseConfig(value: unknown): GameConfig {
       : DEFAULT_ODDS;
 
     const minLevel = Number(parsed.multiplierMinLevel);
-    return { types, odds, multiplierMinLevel: Number.isFinite(minLevel) && minLevel >= 1 ? Math.floor(minLevel) : 3 };
+    const seenTopups = new Set<string>();
+    const topups = Array.isArray(parsed.topups)
+      ? parsed.topups.reduce<TopupPackage[]>((packages, entry) => {
+          if (!entry || typeof entry !== "object" || packages.length >= 20) return packages;
+          const raw = entry as Partial<TopupPackage>;
+          const id = typeof raw.id === "string" ? raw.id.trim().toLowerCase() : "";
+          const price = Number(raw.price);
+          const coins = Number(raw.coins);
+          if (!id || !/^[a-z0-9_-]{1,40}$/i.test(id) || seenTopups.has(id)) return packages;
+          if (!Number.isFinite(price) || price < 0.01 || price > 1_000_000) return packages;
+          if (!Number.isSafeInteger(coins) || coins < 1 || coins > 1_000_000_000) return packages;
+          seenTopups.add(id);
+          packages.push({ id, price: Math.round(price * 100) / 100, coins });
+          return packages;
+        }, [])
+      : DEFAULT_TOPUPS;
+    return { types, odds, multiplierMinLevel: Number.isFinite(minLevel) && minLevel >= 1 ? Math.floor(minLevel) : 3, topups };
   } catch {
     return DEFAULT_CONFIG;
   }
@@ -572,7 +600,8 @@ export default function Home() {
   const [config, setConfig] = useState<GameConfig>(DEFAULT_CONFIG);
   const [ticket, setTicket] = useState<Ticket | null>(null);
   const [hydrated, setHydrated] = useState(false);
-  const [panel, setPanel] = useState<"shop" | "collection" | "settings" | null>(null);
+  const [panel, setPanel] = useState<"shop" | "collection" | "settings" | "topup" | null>(null);
+  const [selectedTopup, setSelectedTopup] = useState<TopupPackage | null>(null);
   const [showHelp, setShowHelp] = useState(false);
   useEffect(() => { if (!showHelp) return; const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setShowHelp(false); }; window.addEventListener("keydown", onKey); return () => window.removeEventListener("keydown", onKey); }, [showHelp]);
   const [toast, setToast] = useState("");
@@ -588,6 +617,55 @@ export default function Home() {
   const settleLock = useRef(false);
   const saveKeyRef = useRef(SAVE_KEY);
   const brandTapRef = useRef({ n: 0, t: 0 });
+  const gameCardRef = useRef<HTMLElement>(null);
+  const sheetRef = useRef<HTMLElement>(null);
+  const topupConfirmRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!panel) return;
+    const sheet = sheetRef.current;
+    const gameCard = gameCardRef.current;
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const focusable = () => Array.from(sheet?.querySelectorAll<HTMLElement>("button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])") || []);
+    gameCard?.setAttribute("inert", "");
+    const focusTimer = window.setTimeout(() => (focusable()[0] || sheet)?.focus(), 0);
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setSelectedTopup(null);
+        setPanel(null);
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const items = focusable();
+      if (!items.length) { event.preventDefault(); sheet?.focus(); return; }
+      const first = items[0], last = items[items.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => {
+      window.clearTimeout(focusTimer);
+      document.removeEventListener("keydown", onKey);
+      gameCard?.removeAttribute("inert");
+      if (previousFocus?.isConnected) previousFocus.focus();
+    };
+  }, [panel]);
+
+  useEffect(() => {
+    if (!selectedTopup) return;
+    const current = config.topups.find((item) => item.id === selectedTopup.id);
+    if (!current || current.price !== selectedTopup.price || current.coins !== selectedTopup.coins) {
+      setSelectedTopup(null);
+      setToast("充值套餐已更新，请重新选择");
+    }
+  }, [config.topups, selectedTopup]);
+
+  useEffect(() => {
+    if (panel !== "topup" || !selectedTopup) return;
+    const focusTimer = window.setTimeout(() => topupConfirmRef.current?.focus(), 0);
+    return () => window.clearTimeout(focusTimer);
+  }, [panel, selectedTopup]);
 
   const armDev = useCallback(() => {
     setDevArmed(true);
@@ -857,6 +935,30 @@ export default function Home() {
     setToast("每日救济：+1,500 金币");
   };
 
+  const confirmDemoTopup = () => {
+    const currentPackage = selectedTopup ? config.topups.find((item) => item.id === selectedTopup.id) : null;
+    if (!currentPackage || !selectedTopup || currentPackage.price !== selectedTopup.price || currentPackage.coins !== selectedTopup.coins || !Number.isSafeInteger(currentPackage.coins) || currentPackage.coins < 1) {
+      setSelectedTopup(null);
+      setToast("这个充值套餐已更新，请重新选择");
+      return;
+    }
+    const nextPlayer = {
+      ...player,
+      coins: Math.min(Number.MAX_SAFE_INTEGER, player.coins + currentPackage.coins),
+      log: pushLog(player.log, { t: Date.now(), k: "topup" as const, a: currentPackage.coins, n: `RM ${currentPackage.price.toFixed(2)}` }),
+    };
+    try {
+      localStorage.setItem(saveKeyRef.current, JSON.stringify({ player: nextPlayer, ticket, saveVersion: 1 }));
+    } catch {
+      setToast("演示充值失败：无法写入本机存档");
+      return;
+    }
+    setPlayer(nextPlayer);
+    setSelectedTopup(null);
+    setPanel(null);
+    setToast(`演示充值 +${formatCoins(currentPackage.coins)} 金币（不会扣款）`);
+  };
+
   const resetSave = () => {
     if (!window.confirm("确定重置所有进度？此操作无法撤销。")) return;
     localStorage.removeItem(saveKeyRef.current);
@@ -915,11 +1017,13 @@ export default function Home() {
   return (
     <main className="app-shell" style={{ "--accent": ticketType.accent, "--accent-2": ticketType.accent2 } as React.CSSProperties}>
       <div className="ambient-orb orb-one" /><div className="ambient-orb orb-two" />
-      <section className="game-card" aria-label="Lucky Scratch game">
+      <section ref={gameCardRef} className="game-card" aria-label="Lucky Scratch game">
         <header className="top-stats">
-          <div className="stat-display">
-            <span>余额</span><strong><i className="coin-dot" />{formatCoins(player.coins)}</strong>
-          </div>
+          {config.topups.length > 0
+            ? <button type="button" className="stat-button stat-balance" onClick={() => { setSelectedTopup(null); setPanel("topup"); }} aria-haspopup="dialog" aria-expanded={panel === "topup"} aria-label={`充值虚拟金币，当前余额 ${formatCoins(player.coins)}`}>
+                <span>余额 · 充值</span><strong><i className="coin-dot" />{formatCoins(player.coins)}</strong>
+              </button>
+            : <div className="stat-display"><span>余额</span><strong><i className="coin-dot" />{formatCoins(player.coins)}</strong></div>}
           <button type="button" className="brand-mark brand-button" onClick={bumpBrandTap}>LUCKY<span>SCRATCH</span></button>
           <div className="top-actions">
             <button className="stat-button stat-right" onClick={() => setPanel("collection")} aria-label="打开收藏">
@@ -1029,10 +1133,27 @@ export default function Home() {
       )}
 
       {panel && (
-        <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setPanel(null); }}>
-          <section className="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title">
+        <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) { setSelectedTopup(null); setPanel(null); } }}>
+          <section ref={sheetRef} tabIndex={-1} className="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title">
             <div className="sheet-handle" />
-            <header><div><span>LUCKY SCRATCH</span><h2 id="sheet-title">{panel === "shop" ? "票种商店" : panel === "collection" ? "我的收藏" : "设置"}</h2></div><button onClick={() => setPanel(null)} aria-label="关闭">×</button></header>
+            <header><div><span>LUCKY SCRATCH</span><h2 id="sheet-title">{panel === "shop" ? "票种商店" : panel === "collection" ? "我的收藏" : panel === "topup" ? "充值虚拟金币" : "设置"}</h2></div><button onClick={() => { setSelectedTopup(null); setPanel(null); }} aria-label="关闭">×</button></header>
+
+            {panel === "topup" && <div className="topup-content">
+              <div className="topup-notice"><b>演示充值</b><span>不会真实扣款 · 金币只保存在本设备</span></div>
+              {config.topups.length === 0
+                ? <div className="topup-empty"><span>◇</span><b>暂未开放充值套餐</b><p>请稍后再回来看看。</p></div>
+                : <div className="topup-grid">{config.topups.map((item) => (
+                    <button type="button" className={selectedTopup?.id === item.id ? "selected" : ""} key={item.id} onClick={() => setSelectedTopup({ ...item })}>
+                      <span>虚拟金币</span><strong>+{formatCoins(item.coins)}</strong><small>参考价 RM {item.price.toFixed(2)}</small>
+                    </button>
+                  ))}</div>}
+              {selectedTopup && <div ref={topupConfirmRef} tabIndex={-1} aria-live="polite" className="topup-confirm">
+                <p>确认领取 <b>+{formatCoins(selectedTopup.coins)}</b> 虚拟金币？</p>
+                <small>显示参考价 RM {selectedTopup.price.toFixed(2)}，本演示不会产生任何付款。</small>
+                <div><button type="button" onClick={() => setSelectedTopup(null)}>取消</button><button type="button" className="confirm" onClick={confirmDemoTopup}>确认演示充值</button></div>
+              </div>}
+              <p className="topup-footnote">这是本地演示功能，不会收集付款资料，也不会产生订单、退款或现金价值。</p>
+            </div>}
 
             {panel === "shop" && <div className="ticket-list">{config.types.map((type) => {
               const locked = player.level < type.unlockLevel;
