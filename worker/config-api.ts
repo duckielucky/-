@@ -35,13 +35,27 @@ type TierConfig = {
   specialChance: number;
 };
 
+type TopupPackage = {
+  id: string;
+  price: number;
+  coins: number;
+};
+
 type OperatorConfig = {
   schemaVersion: 1;
   updatedAt: number;
   multiplierMinLevel: number;
   odds: { m0: number; m1: number; m2: number; m3: number };
   tiers: TierConfig[];
+  topups: TopupPackage[];
 };
+
+const DEFAULT_TOPUPS: TopupPackage[] = [
+  { id: "starter", price: 4.9, coins: 5000 },
+  { id: "value", price: 9.9, coins: 12000 },
+  { id: "popular", price: 19.9, coins: 30000 },
+  { id: "mega", price: 49.9, coins: 80000 },
+];
 
 const CREATE_TABLE = `
   CREATE TABLE IF NOT EXISTS game_config (
@@ -98,7 +112,30 @@ function readNumberList(value: unknown, label: string, min: number, max: number,
   return result;
 }
 
-function validateConfig(value: unknown, updatedAt: number): OperatorConfig {
+function validateTopups(value: unknown, fallback: TopupPackage[] = DEFAULT_TOPUPS): TopupPackage[] {
+  if (value === undefined) return fallback.map((item) => ({ ...item }));
+  if (!Array.isArray(value) || value.length > 20) throw new Error("topups must contain 0-20 packages");
+  const seenIds = new Set<string>();
+  return value.map((rawPackage, index): TopupPackage => {
+    if (!isRecord(rawPackage)) throw new Error(`topups[${index}] must be an object`);
+    const id = readString(rawPackage.id, `topups[${index}].id`, 40).toLowerCase();
+    if (!/^[a-z0-9_-]+$/i.test(id)) throw new Error(`topups[${index}].id may only use letters, numbers, _ and -`);
+    if (seenIds.has(id)) throw new Error(`duplicate top-up id: ${id}`);
+    seenIds.add(id);
+
+    const price = readNumber(rawPackage.price, `topups[${index}].price`, 0.01, 1_000_000);
+    if (Math.abs(price * 100 - Math.round(price * 100)) > 1e-8) {
+      throw new Error(`topups[${index}].price may use at most 2 decimal places`);
+    }
+    return {
+      id,
+      price: Math.round(price * 100) / 100,
+      coins: readInteger(rawPackage.coins, `topups[${index}].coins`, 1, 1_000_000_000),
+    };
+  });
+}
+
+function validateConfig(value: unknown, updatedAt: number, fallbackTopups: TopupPackage[] = DEFAULT_TOPUPS): OperatorConfig {
   if (!isRecord(value)) throw new Error("config must be an object");
   if (!isRecord(value.odds)) throw new Error("odds must be an object");
   if (!Array.isArray(value.tiers) || value.tiers.length < 1 || value.tiers.length > 12) {
@@ -149,6 +186,7 @@ function validateConfig(value: unknown, updatedAt: number): OperatorConfig {
     multiplierMinLevel: readInteger(value.multiplierMinLevel, "multiplierMinLevel", 1, 1_000_000),
     odds,
     tiers,
+    topups: validateTopups(value.topups, fallbackTopups),
   };
 }
 
@@ -177,6 +215,7 @@ async function getConfig(db: D1Database, request: Request): Promise<Response> {
   } catch {
     return error("The stored game configuration is damaged", 500);
   }
+  if (isRecord(config) && config.topups === undefined) config = { ...config, topups: DEFAULT_TOPUPS };
   const etag = `\"lucky-config-v${row.version}\"`;
   if (request.headers.get("if-none-match") === etag) {
     return new Response(null, { status: 304, headers: { etag, "cache-control": "no-store" } });
@@ -208,9 +247,22 @@ async function putConfig(db: D1Database, request: Request, env: ConfigEnv): Prom
   if (!Number.isSafeInteger(expectedVersion) || expectedVersion < 0) return error("expectedVersion must be a non-negative integer", 400);
 
   const updatedAt = Date.now();
+  let fallbackTopups = DEFAULT_TOPUPS;
+  if (isRecord(body.config) && body.config.topups === undefined && expectedVersion > 0) {
+    const existing = await currentRow(db);
+    if (existing?.version === expectedVersion) {
+      try {
+        const stored = JSON.parse(existing.configJson);
+        if (isRecord(stored) && Array.isArray(stored.topups)) fallbackTopups = validateTopups(stored.topups);
+      } catch {
+        // Legacy or damaged top-up data falls back to the built-in catalog; the version check still guards the write.
+      }
+    }
+  }
+
   let config: OperatorConfig;
   try {
-    config = validateConfig(body.config, updatedAt);
+    config = validateConfig(body.config, updatedAt, fallbackTopups);
   } catch (validationError) {
     return error(validationError instanceof Error ? validationError.message : "Configuration is invalid", 422);
   }
@@ -248,7 +300,7 @@ export async function handleConfigApi(request: Request, env: ConfigEnv): Promise
       const response = await getConfig(env.DB, request);
       return request.method === "HEAD" ? new Response(null, response) : response;
     }
-    if (request.method === "PUT") return putConfig(env.DB, request, env);
+    if (request.method === "PUT") return await putConfig(env.DB, request, env);
     return json({ error: "Method not allowed" }, 405, { allow: "GET, HEAD, PUT" });
   } catch (databaseError) {
     console.error("config-api", databaseError instanceof Error ? databaseError.message : databaseError);
