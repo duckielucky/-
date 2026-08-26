@@ -8,6 +8,13 @@
       "when": 1787635815173,
       "tag": "0000_first_agent_brand",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1787710560152,
+      "tag": "0001_watery_giant_man",
+      "breakpoints": true
     }
   ]
 }

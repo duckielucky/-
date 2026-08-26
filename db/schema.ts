@@ -7,3 +7,12 @@ export const gameConfig = sqliteTable("game_config", {
   version: integer("version").notNull().default(1),
   updatedAt: integer("updated_at").notNull(),
 });
+
+/** Password hash for the cloud-synced manager login. */
+export const managerSecret = sqliteTable("manager_secret", {
+  key: text("key").primaryKey(),
+  hash: text("hash").notNull(),
+  salt: text("salt").notNull(),
+  algorithm: text("algorithm").notNull(),
+  updatedAt: integer("updated_at").notNull(),
+});

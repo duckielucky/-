@@ -376,6 +376,8 @@
   .rtp-set-row .btn{flex:none}
   .rtp-set-hint{margin:8px 0 0;font-size:11px;color:var(--dim);line-height:1.5}
   .rtp-set-hint b{color:var(--muted)}
+  .pw-error{display:none;padding:10px 12px;border-radius:9px;border:1px solid color-mix(in srgb,var(--danger) 32%,var(--line));background:color-mix(in srgb,var(--danger) 8%,transparent);color:var(--danger);font-size:12.5px;line-height:1.5}
+  .pw-error.on{display:block}
 
   .overview{padding:16px 18px 18px}
   .overview h3{margin:0 0 3px;font-size:13px;font-weight:800}
@@ -758,6 +760,7 @@
   <div class="actions">
     <button class="btn" id="btnExport">导出配置</button>
     <button class="btn" id="btnImport">导入配置</button>
+    <button class="btn" id="btnChangePw" type="button">修改密码</button>
     <button class="btn" id="btnLogout" type="button">退出后台</button>
     <button class="btn btn-danger" id="btnReset">恢复默认</button>
     <button class="btn btn-primary" id="btnSave" disabled>保存并应用</button>
@@ -950,6 +953,42 @@
       <button class="help-x" id="helpX" type="button" aria-label="关闭">×</button>
     </header>
     <div class="help-body" id="helpBody"></div>
+  </section>
+</div>
+
+<div class="help-back" id="pwBack" role="presentation">
+  <section class="help" role="dialog" aria-modal="true" aria-labelledby="pwTitle" style="width:min(100%,440px)">
+    <header>
+      <div style="flex:1">
+        <h2 id="pwTitle">修改管理密码</h2>
+        <p>新密码保存在云端数据库，并用于之后的后台登录。已登录会话会在退出或到期后结束。</p>
+      </div>
+      <button class="help-x" id="pwClose" type="button" aria-label="关闭">×</button>
+    </header>
+    <div class="help-body">
+      <form id="pwForm" novalidate style="display:grid;gap:14px">
+        <div class="field">
+          <label for="pwCurrent">当前密码</label>
+          <input id="pwCurrent" type="password" autocomplete="current-password" />
+        </div>
+        <div class="field">
+          <label for="pwNew">新密码 <em>（至少 10 位）</em></label>
+          <input id="pwNew" type="password" autocomplete="new-password" />
+        </div>
+        <div class="field">
+          <label for="pwConfirm">确认新密码</label>
+          <input id="pwConfirm" type="password" autocomplete="new-password" />
+        </div>
+        <div class="pw-error" id="pwError" role="alert"></div>
+        <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:2px">
+          <button class="btn" id="pwCancel" type="button">取消</button>
+          <button class="btn btn-primary" id="pwSubmit" type="submit">保存新密码</button>
+        </div>
+      </form>
+      <p style="margin:14px 0 0;font-size:11px;line-height:1.6;color:var(--dim)">
+        提示：Cloudflare 里设置的 <code style="font-family:var(--mono)">MANAGER_TOKEN</code> 密钥仍可作为应急恢复凭据登录。
+      </p>
+    </div>
   </section>
 </div>
 
@@ -1885,6 +1924,53 @@
     } finally {
       button.disabled = false;
       button.textContent = "退出后台";
+    }
+  };
+
+  // ---- change manager password ----
+  function openPwModal() {
+    $("pwCurrent").value = ""; $("pwNew").value = ""; $("pwConfirm").value = "";
+    $("pwError").className = "pw-error"; $("pwError").textContent = "";
+    $("pwBack").className = "help-back on";
+    setTimeout(function () { $("pwCurrent").focus(); }, 0);
+  }
+  function closePwModal() { $("pwBack").className = "help-back"; }
+  function pwError(message) { $("pwError").textContent = message; $("pwError").className = "pw-error on"; }
+
+  $("btnChangePw").onclick = openPwModal;
+  $("pwClose").onclick = closePwModal;
+  $("pwCancel").onclick = closePwModal;
+  $("pwBack").onmousedown = function (e) { if (e.target === $("pwBack")) closePwModal(); };
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && $("pwBack").className.indexOf("on") >= 0) closePwModal();
+  });
+
+  $("pwForm").onsubmit = async function (e) {
+    e.preventDefault();
+    var current = $("pwCurrent").value, next = $("pwNew").value, confirmPw = $("pwConfirm").value;
+    if (!current) { pwError("请输入当前密码"); return; }
+    if (next.length < 10) { pwError("新密码至少 10 位"); return; }
+    if (next.length > 128) { pwError("新密码过长（最多 128 位）"); return; }
+    if (next !== confirmPw) { pwError("两次输入的新密码不一致"); return; }
+    if (next === current) { pwError("新密码不能与当前密码相同"); return; }
+
+    var button = $("pwSubmit");
+    button.disabled = true; button.textContent = "保存中…";
+    try {
+      var response = await fetch("/api/manager/password", {
+        method: "POST", credentials: "same-origin", cache: "no-store",
+        headers: { "accept": "application/json", "content-type": "application/json" },
+        body: JSON.stringify({ currentPassword: current, newPassword: next })
+      });
+      if (response.ok) { closePwModal(); toast("管理密码已更新，下次登录请用新密码"); return; }
+      if (response.status === 401) pwError("当前密码不正确");
+      else if (response.status === 422) pwError("新密码不符合要求（至少 10 位且与当前不同）");
+      else if (response.status === 503) pwError("云端存储（D1）不可用，暂时无法修改密码");
+      else pwError("修改失败，请稍后重试");
+    } catch (err) {
+      pwError("网络连接失败，请稍后重试");
+    } finally {
+      button.disabled = false; button.textContent = "保存新密码";
     }
   };
 
