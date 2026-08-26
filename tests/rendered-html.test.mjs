@@ -20,6 +20,7 @@ async function render() {
 
 function createConfigDb() {
   let row = null;
+  let managerSecret = null;
   return {
     prepare(sql) {
       let values = [];
@@ -27,6 +28,7 @@ function createConfigDb() {
         bind(...next) { values = next; return statement; },
         async first() {
           if (/SELECT config_json/i.test(sql) && row) return { configJson: row.configJson, version: row.version, updatedAt: row.updatedAt };
+          if (/SELECT hash, salt, algorithm FROM manager_secret/i.test(sql) && managerSecret) return { ...managerSecret };
           return null;
         },
         async run() {
@@ -39,6 +41,10 @@ function createConfigDb() {
           if (/UPDATE game_config/i.test(sql)) {
             if (!row || row.version !== values[3]) return { meta: { changes: 0 } };
             row = { configJson: values[0], version: row.version + 1, updatedAt: values[1] };
+            return { meta: { changes: 1 } };
+          }
+          if (/INSERT INTO manager_secret/i.test(sql)) {
+            managerSecret = { hash: values[1], salt: values[2], algorithm: values[3], updatedAt: values[4] };
             return { meta: { changes: 1 } };
           }
           throw new Error(`Unexpected SQL: ${sql}`);
@@ -152,7 +158,9 @@ test("ships the game systems and installable assets", async () => {
   assert.match(login, /id="loginForm"/);
   assert.match(profile, /class="auth-shell profile-shell"/);
   assert.match(manager, /id="btnLogout"/);
+  assert.match(manager, /id="btnChangePw"/);
   assert.match(manager, /\/api\/manager\/session/);
+  assert.match(manager, /\/api\/manager\/password/);
   assert.match(manager, /method:\s*"DELETE"/);
   assert.match(manager, /credentials:\s*"same-origin"/);
   assert.match(managerLoginPage, /id="loginForm"/);
@@ -260,6 +268,62 @@ test("keeps a strong signing secret separate from the manager password", async (
     body: JSON.stringify({ password: MANAGER_SESSION_SECRET }),
   }, { MANAGER_PASSWORD: undefined });
   assert.equal(legacyFallback.status, 200);
+});
+
+test("changes the manager password in D1 without exposing or reviving credentials", async () => {
+  const db = createConfigDb();
+  const loggedIn = await managerLogin(db);
+  assert.equal(loggedIn.status, 200);
+  const { cookie } = readSessionCookie(loggedIn);
+
+  const unauthorized = await apiFetch(db, "/api/manager/password", {
+    method: "POST",
+    headers: sameOriginHeaders({ "content-type": "application/json" }),
+    body: JSON.stringify({ currentPassword: MANAGER_PASSWORD, newPassword: "ChangedPass123" }),
+  });
+  assert.equal(unauthorized.status, 401);
+
+  const wrongCurrent = await apiFetch(db, "/api/manager/password", {
+    method: "POST",
+    headers: sameOriginHeaders({ "content-type": "application/json", cookie }),
+    body: JSON.stringify({ currentPassword: "wrong-password", newPassword: "ChangedPass123" }),
+  });
+  assert.equal(wrongCurrent.status, 401);
+
+  const tooShort = await apiFetch(db, "/api/manager/password", {
+    method: "POST",
+    headers: sameOriginHeaders({ "content-type": "application/json", cookie }),
+    body: JSON.stringify({ currentPassword: MANAGER_PASSWORD, newPassword: "short" }),
+  });
+  assert.equal(tooShort.status, 422);
+
+  const changed = await apiFetch(db, "/api/manager/password", {
+    method: "POST",
+    headers: sameOriginHeaders({ "content-type": "application/json", cookie }),
+    body: JSON.stringify({ currentPassword: MANAGER_PASSWORD, newPassword: "ChangedPass123" }),
+  });
+  assert.equal(changed.status, 200);
+  assert.deepEqual(await changed.json(), { ok: true });
+
+  const oldPassword = await managerLogin(db, MANAGER_PASSWORD);
+  assert.equal(oldPassword.status, 401);
+  const newPassword = await managerLogin(db, "ChangedPass123");
+  assert.equal(newPassword.status, 200);
+  const recoveryToken = await managerLogin(db, MANAGER_SESSION_SECRET);
+  assert.equal(recoveryToken.status, 200);
+
+  const failingDb = { prepare() { throw new Error("D1 unavailable"); } };
+  const oldPasswordDuringOutage = await managerLogin(failingDb, MANAGER_PASSWORD);
+  assert.equal(oldPasswordDuringOutage.status, 401);
+  const recoveryDuringOutage = await managerLogin(failingDb, MANAGER_SESSION_SECRET);
+  assert.equal(recoveryDuringOutage.status, 200);
+
+  const crossOrigin = await apiFetch(db, "/api/manager/password", {
+    method: "POST",
+    headers: { "content-type": "application/json", cookie, origin: "https://example.com", "sec-fetch-site": "cross-site" },
+    body: JSON.stringify({ currentPassword: "ChangedPass123", newPassword: "AnotherPass123" }),
+  });
+  assert.equal(crossOrigin.status, 403);
 });
 
 test("gates encoded manager aliases before static routing", async () => {
