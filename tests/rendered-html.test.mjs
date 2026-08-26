@@ -95,6 +95,10 @@ const VALID_CONFIG = {
   updatedAt: 0,
   multiplierMinLevel: 3,
   odds: { m0: 0.45, m1: 0.33, m2: 0.16, m3: 0.06 },
+  topups: [
+    { id: "starter", price: 4.9, coins: 5000 },
+    { id: "value", price: 9.9, coins: 12000 },
+  ],
   tiers: [{
     id: "starter_100x", name: "100X Starter", shortName: "100X", maxLabel: "100X", feature: "经典对号中奖",
     cost: 500, unlockLevel: 1, accent: "#d743ff", accent2: "#7c2eff",
@@ -144,6 +148,13 @@ test("ships the game systems and installable assets", async () => {
   assert.match(page, /prizeTier/);
   assert.match(page, /prizeEffectPower/);
   assert.match(page, /fetchCloudConfig/);
+  assert.match(page, /confirmDemoTopup/);
+  assert.match(page, /panel\("topup"\)|setPanel\("topup"\)/);
+  assert.match(page, /不会真实扣款/);
+  assert.match(page, /金币只保存在本设备/);
+  assert.match(page, /currentPackage\.price !== selectedTopup\.price/);
+  assert.match(page, /setAttribute\("inert", ""\)/);
+  assert.match(page, /topupConfirmRef/);
   assert.match(page, /BroadcastChannel/);
   assert.match(page, /result-particles/);
   assert.match(page, /WinConfetti.*intensity/s);
@@ -159,6 +170,9 @@ test("ships the game systems and installable assets", async () => {
   assert.match(profile, /class="auth-shell profile-shell"/);
   assert.match(manager, /id="btnLogout"/);
   assert.match(manager, /id="btnChangePw"/);
+  assert.match(manager, /id="btnAddTopup"/);
+  assert.match(manager, /id="topupRows"/);
+  assert.match(manager, /删除套餐/);
   assert.match(manager, /\/api\/manager\/session/);
   assert.match(manager, /\/api\/manager\/password/);
   assert.match(manager, /method:\s*"DELETE"/);
@@ -177,7 +191,7 @@ test("ships the game systems and installable assets", async () => {
   assert.match(serviceWorker, /caches\.open\(CACHE\)/);
   assert.match(serviceWorker, /pathname\.startsWith\("\/api\/"\)/);
   assert.match(serviceWorker, /canonicalPathname/);
-  assert.match(serviceWorker, /const CACHE = "lucky-scratch-v10"/);
+  assert.match(serviceWorker, /const CACHE = "lucky-scratch-v11"/);
   assert.match(serviceWorker, /pathname === "\/manager\/"/);
   assert.match(serviceWorker, /pathname === "\/manager-login\/"/);
   assert.match(serviceWorker, /pathname === "\/manager-login\.html"/);
@@ -203,8 +217,11 @@ test("removes the daily reward claim while preserving legacy history support", a
     readFile(new URL("../public/profile.html", import.meta.url), "utf8"),
   ]);
   assert.doesNotMatch(page, /\bclaimDaily\b|\bdailyAvailable\b|领取每日奖励|每日礼包|每日奖励/);
-  assert.match(page, /<div className="stat-display">\s*<span>余额<\/span>.*formatCoins\(player\.coins\)/s);
+  assert.match(page, /className="stat-button stat-balance"/);
+  assert.match(page, /setPanel\("topup"\)/);
+  assert.match(page, /<span>余额 · 充值<\/span><strong><i className="coin-dot" \/>\{formatCoins\(player\.coins\)\}<\/strong>/);
   assert.match(profile, /daily:\s*\{[^}]*每日奖励/s);
+  assert.match(profile, /topup:\s*\{[^}]*演示充值（未扣款）/s);
 });
 
 test("creates, checks, and expires an HttpOnly signed manager session", async () => {
@@ -404,6 +421,7 @@ test("protects config writes with the signed session while keeping config reads 
   const first = await created.json();
   assert.equal(first.version, 1);
   assert.equal(first.config.updatedAt, first.updatedAt);
+  assert.deepEqual(first.config.topups, VALID_CONFIG.topups);
 
   const stale = await apiFetch(db, "/api/config", {
     method: "PUT",
@@ -415,28 +433,41 @@ test("protects config writes with the signed session while keeping config reads 
   const updated = await apiFetch(db, "/api/config", {
     method: "PUT",
     headers: sameOriginHeaders({ "content-type": "application/json", cookie }),
-    body: JSON.stringify({ config: { ...VALID_CONFIG, multiplierMinLevel: 4 }, expectedVersion: 1 }),
+    body: JSON.stringify({ config: { ...VALID_CONFIG, multiplierMinLevel: 4, topups: [{ id: "mega", price: 49.9, coins: 80000 }] }, expectedVersion: 1 }),
   });
   assert.equal(updated.status, 200);
-  assert.equal((await updated.json()).version, 2);
+  const updatedBody = await updated.json();
+  assert.equal(updatedBody.version, 2);
+  assert.deepEqual(updatedBody.config.topups, [{ id: "mega", price: 49.9, coins: 80000 }]);
+
+  const disabledTopups = await apiFetch(db, "/api/config", {
+    method: "PUT",
+    headers: sameOriginHeaders({ "content-type": "application/json", cookie }),
+    body: JSON.stringify({ config: { ...VALID_CONFIG, multiplierMinLevel: 4, topups: [] }, expectedVersion: 2 }),
+  });
+  assert.equal(disabledTopups.status, 200);
+  const disabledBody = await disabledTopups.json();
+  assert.equal(disabledBody.version, 3);
+  assert.deepEqual(disabledBody.config.topups, []);
 
   const publicConfig = await apiFetch(db);
   assert.equal(publicConfig.status, 200);
   const publicBody = await publicConfig.json();
-  assert.equal(publicBody.version, 2);
+  assert.equal(publicBody.version, 3);
   assert.equal(publicBody.config.multiplierMinLevel, 4);
+  assert.deepEqual(publicBody.config.topups, []);
 
   const crossOrigin = await apiFetch(db, "/api/config", {
     method: "PUT",
     headers: { "content-type": "application/json", cookie, origin: "https://example.com", "sec-fetch-site": "cross-site" },
-    body: JSON.stringify({ config: VALID_CONFIG, expectedVersion: 2 }),
+    body: JSON.stringify({ config: VALID_CONFIG, expectedVersion: 3 }),
   });
   assert.equal(crossOrigin.status, 403);
 
   const crossSiteHeader = await apiFetch(db, "/api/config", {
     method: "PUT",
     headers: { "content-type": "application/json", cookie, origin: API_ORIGIN, "sec-fetch-site": "cross-site" },
-    body: JSON.stringify({ config: VALID_CONFIG, expectedVersion: 2 }),
+    body: JSON.stringify({ config: VALID_CONFIG, expectedVersion: 3 }),
   });
   assert.equal(crossSiteHeader.status, 403);
 
@@ -452,4 +483,87 @@ test("protects config writes with the signed session while keeping config reads 
     headers: { cookie, origin: "https://example.com", "sec-fetch-site": "cross-site" },
   });
   assert.equal(crossOriginLogout.status, 403);
+});
+
+test("validates top-up packages and preserves them for legacy manager writes", async () => {
+  const db = createConfigDb();
+  const loggedIn = await managerLogin(db);
+  const { cookie } = readSessionCookie(loggedIn);
+
+  const created = await apiFetch(db, "/api/config", {
+    method: "PUT",
+    headers: sameOriginHeaders({ "content-type": "application/json", cookie }),
+    body: JSON.stringify({ config: VALID_CONFIG, expectedVersion: 0 }),
+  });
+  assert.equal(created.status, 200);
+
+  const legacyConfig = { ...VALID_CONFIG, multiplierMinLevel: 8 };
+  delete legacyConfig.topups;
+  const legacyUpdate = await apiFetch(db, "/api/config", {
+    method: "PUT",
+    headers: sameOriginHeaders({ "content-type": "application/json", cookie }),
+    body: JSON.stringify({ config: legacyConfig, expectedVersion: 1 }),
+  });
+  assert.equal(legacyUpdate.status, 200);
+  assert.deepEqual((await legacyUpdate.json()).config.topups, VALID_CONFIG.topups);
+
+  const outageDb = {
+    prepare(sql) {
+      if (/SELECT config_json/i.test(sql)) {
+        return {
+          bind() { return this; },
+          async first() { throw new Error("sensitive D1 diagnostic"); },
+        };
+      }
+      return db.prepare(sql);
+    },
+  };
+  const originalConsoleError = console.error;
+  console.error = () => {};
+  try {
+    const unavailable = await apiFetch(outageDb, "/api/config", {
+      method: "PUT",
+      headers: sameOriginHeaders({ "content-type": "application/json", cookie }),
+      body: JSON.stringify({ config: legacyConfig, expectedVersion: 2 }),
+    });
+    assert.equal(unavailable.status, 503);
+    const unavailableBody = await unavailable.json();
+    assert.equal(unavailableBody.error, "Shared configuration storage is temporarily unavailable");
+    assert.doesNotMatch(JSON.stringify(unavailableBody), /sensitive D1 diagnostic/);
+  } finally {
+    console.error = originalConsoleError;
+  }
+
+  const invalidTopups = [
+    "not-an-array",
+    Array.from({ length: 21 }, (_, index) => ({ id: `pkg_${index}`, price: 1, coins: 1 })),
+    [{ id: "same", price: 1, coins: 1 }, { id: "SAME", price: 2, coins: 2 }],
+    [{ id: "bad id", price: 1, coins: 1 }],
+    [{ id: "free", price: 0, coins: 1 }],
+    [{ id: "mills", price: 1.001, coins: 1 }],
+    [{ id: "fractional", price: 1, coins: 1.5 }],
+    [{ id: "empty", price: 1, coins: 0 }],
+  ];
+
+  for (const topups of invalidTopups) {
+    const response = await apiFetch(db, "/api/config", {
+      method: "PUT",
+      headers: sameOriginHeaders({ "content-type": "application/json", cookie }),
+      body: JSON.stringify({ config: { ...VALID_CONFIG, topups }, expectedVersion: 2 }),
+    });
+    assert.equal(response.status, 422, JSON.stringify(topups).slice(0, 120));
+  }
+
+  const legacyDb = createConfigDb();
+  const legacyLogin = await managerLogin(legacyDb);
+  const legacyCookie = readSessionCookie(legacyLogin).cookie;
+  const firstLegacyConfig = { ...VALID_CONFIG };
+  delete firstLegacyConfig.topups;
+  const legacyCreate = await apiFetch(legacyDb, "/api/config", {
+    method: "PUT",
+    headers: sameOriginHeaders({ "content-type": "application/json", cookie: legacyCookie }),
+    body: JSON.stringify({ config: firstLegacyConfig, expectedVersion: 0 }),
+  });
+  assert.equal(legacyCreate.status, 200);
+  assert.equal((await legacyCreate.json()).config.topups.length > 0, true);
 });

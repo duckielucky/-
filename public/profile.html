@@ -201,7 +201,8 @@
     buy:    { ic: "🎟️", pos: false, label: function (e) { return e.n || "彩票"; } },
     win:    { ic: "🎉", pos: true,  label: function (e) { return (e.n ? e.n + " " : "") + "中奖"; } },
     daily:  { ic: "🎁", pos: true,  label: function () { return "每日奖励"; } },
-    rescue: { ic: "🛟", pos: true,  label: function () { return "每日救济"; } }
+    rescue: { ic: "🛟", pos: true,  label: function () { return "每日救济"; } },
+    topup:  { ic: "🪙", pos: true,  label: function (e) { return "演示充值（未扣款）" + (e.n ? " · 参考价 " + e.n : ""); } }
   };
   function renderLog() {
     var p = LuckyAuth.gameProgress();

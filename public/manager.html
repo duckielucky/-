@@ -317,6 +317,22 @@
     border:1px solid var(--line-strong);background:#00000038;cursor:pointer;
   }
 
+  /* ---------- global virtual-coin top-up packages ---------- */
+  .topup-list{display:grid;gap:10px;margin-top:12px}
+  .topup-row{
+    display:grid;grid-template-columns:38px minmax(150px,1fr) minmax(170px,1fr) auto;
+    gap:10px;align-items:end;padding:12px;border:1px solid var(--line);border-radius:12px;background:#ffffff06;
+  }
+  .topup-index{display:grid;place-items:center;width:32px;height:38px;border-radius:9px;background:#ffffff0b;color:var(--dim);font-family:var(--mono);font-size:11px}
+  .topup-delete{min-height:38px;align-self:end}
+  .topup-empty{padding:24px 14px;border:1px dashed var(--line-strong);border-radius:12px;color:var(--dim);font-size:12px;line-height:1.65;text-align:center}
+  .topup-hint{margin:11px 0 0;color:var(--dim);font-size:11px;line-height:1.6}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
+  @media (max-width:620px){
+    .topup-row{grid-template-columns:32px 1fr auto}
+    .topup-row .field:nth-of-type(2){grid-column:2/4}
+  }
+
   /* ---------- odds ---------- */
   .odds-row{display:grid;gap:10px;grid-template-columns:repeat(4,1fr)}
   @media (max-width:620px){.odds-row{grid-template-columns:repeat(2,1fr)}}
@@ -882,6 +898,20 @@
       </div>
     </section>
 
+    <!-- 虚拟金币充值套餐（全局） -->
+    <section class="card sec">
+      <div class="sec-head">
+        <h2>充值套餐</h2>
+        <span class="tag" id="tagTopup">4 个套餐</span>
+        <span style="margin-left:auto;display:flex;gap:8px;align-items:center">
+          <button class="btn" id="btnAddTopup" type="button" style="padding:5px 11px;font-size:12px">＋ 新增套餐</button>
+          <button class="info" type="button" data-help="topup" aria-label="充值套餐怎么用" style="margin-left:0">i</button>
+        </span>
+      </div>
+      <div class="topup-list" id="topupRows"></div>
+      <p class="topup-hint">这里设置游戏内显示的参考价格与虚拟金币数量。当前版本为演示充值，不会真实扣款；删除全部套餐会关闭游戏内充值入口。</p>
+    </section>
+
     <p class="foot">
       点击<b>保存并应用</b>会把配置同步到 Cloudflare，所有设备上的游戏会自动获取新版本。
       浏览器仍会在 <code>lucky_config_v1</code> 保留离线副本；后台登录在本次浏览器会话中保持有效。
@@ -1026,6 +1056,12 @@
       updatedAt: 0,
       multiplierMinLevel: 3,
       odds: { m0: 0.45, m1: 0.33, m2: 0.16, m3: 0.06 },
+      topups: [
+        { id: "starter", price: 4.9, coins: 5000 },
+        { id: "value", price: 9.9, coins: 12000 },
+        { id: "popular", price: 19.9, coins: 30000 },
+        { id: "mega", price: 49.9, coins: 80000 }
+      ],
       tiers: [
         { id: "starter_100x", name: "100X Starter", shortName: "100X", maxLabel: "100X", feature: "经典对号中奖",
           cost: 500, unlockLevel: 1, accent: "#d743ff", accent2: "#7c2eff",
@@ -1076,7 +1112,7 @@
     guide: {
       title: "运营后台使用说明", sub: "这个后台是用来干嘛的",
       body: [
-        { h: "它管什么", p: "这里配置每种<b>刮刮乐票种</b>的经济参数——奖金池、倍数池、票价、中奖概率。所有改动都会影响玩家的<b>赔付率（RTP）</b>：系统是在回收金币，还是在倒贴。" },
+        { h: "它管什么", p: "这里配置每种<b>刮刮乐票种</b>的经济参数——奖金池、倍数池、票价、中奖概率，也可以管理游戏里展示的<b>虚拟金币充值套餐</b>。票种参数会影响玩家的<b>赔付率（RTP）</b>。" },
         { h: "怎么改", p: "左边先选<b>票种</b>，中间各区块改参数。每个区块右上角的 <b>ⓘ</b> 点开都有详细说明。改动后顶部会亮起「有未保存的更改」，点 <b>保存并应用</b> 才生效。" },
         { h: "先盯这个数", p: "右侧<b>实时赔付率 RTP</b> 是最关键的指标：低于 100% 在回收金币，高于 100% 每卖一张都在净发金币。健康区间大约 <b>45%–90%</b>。" },
         { h: "备份与还原", p: "<b>导出配置</b> 存成 JSON 备份；<b>导入配置</b> 载入旧备份；<b>恢复默认</b> 回到出厂参数（会清掉当前改动，慎用）。" },
@@ -1124,6 +1160,15 @@
         { warn: "调它是最<b>公平</b>的收紧手段——不用动任何奖金数字，玩家看到的奖金还是那么诱人，只是中的频率低了。代价是<b>空票变多</b>，手感会变差，别一次调太狠。" }
       ]
     },
+    topup: {
+      title: "充值套餐", sub: "游戏里展示多少参考价、发多少虚拟金币",
+      body: [
+        { h: "这是全局设置", p: "充值套餐不属于某个票种。每个套餐包含一个 <b>RM 参考价格</b>和一个<b>虚拟金币数量</b>，所有设备都会读取同一份云端配置。" },
+        { h: "怎么改", p: "点<b>新增套餐</b>添加一行，直接修改参考价格或金币数量；点<b>删除套餐</b>移除。最多保留 20 个套餐，也可以全部删除来关闭游戏内充值入口。" },
+        { h: "什么时候生效", p: "修改后必须点<b>保存并应用</b>。游戏会自动取得新配置，已经打开的设备通常会在 30 秒内刷新。" },
+        { warn: "当前是<b>演示充值</b>：不会调用支付平台、不会真实扣款，虚拟金币只写入玩家当前设备的本地存档。若以后接真实付款，必须另建服务端账户账本、支付回调和防重复入账机制。" }
+      ]
+    },
     rtp: {
       title: "赔付率 RTP", sub: "系统是在赚钱还是在倒贴",
       body: [
@@ -1137,7 +1182,7 @@
             "<b>高于 150%</b>　失衡 — 等于无限增发金币"
           ] },
         { h: "一键调到目标", p: "在下面<b>目标赔付率</b>框里填一个百分比（如 <code>80</code>）点<b>套用</b>，它会<b>按比例缩放本票种的整个奖金池</b>去命中这个赔付率——因为赔付率和平均奖金成正比。倍数、概率、票价都不动，只动奖金数字。四舍五入会有一点点误差，套用后看仪表上的实际值即可。想改别的票种，先在左边选中它再套用。" },
-        { h: "它只算了买票这一条线", p: "破产救济、新手的初始金币都是<b>额外</b>发出去的金币，这里没算进去。所以真实的膨胀速度比这个数字更快一点——把赔付率压在 100% 以下才算安全。" },
+        { h: "它只算了买票这一条线", p: "破产救济、新手初始金币和演示充值套餐都是<b>额外</b>发出去的金币，这里没算进去。所以真实的膨胀速度比这个数字更快一点——把赔付率压在 100% 以下才算安全。" },
         { warn: "这些是<b>虚拟金币</b>的经验区间，不是现金博彩的合规要求。真要做涉及真钱的玩法，请先去确认当地法规。" }
       ]
     },
@@ -1231,6 +1276,22 @@
     }
     var lvl = Number(raw.multiplierMinLevel);
     if (isFinite(lvl) && lvl >= 1) out.multiplierMinLevel = Math.floor(lvl);
+
+    if (Array.isArray(raw.topups)) {
+      out.topups = [];
+      var seenTopupIds = {};
+      raw.topups.slice(0, 20).forEach(function (item) {
+        if (!item || typeof item !== "object") return;
+        var id = String(item.id || "").trim().toLowerCase();
+        var price = Number(item.price);
+        var coins = Number(item.coins);
+        if (!/^[a-z0-9_-]{1,40}$/i.test(id) || seenTopupIds[id]) return;
+        if (!isFinite(price) || price < 0.01 || price > 1000000) return;
+        if (!Number.isSafeInteger(coins) || coins < 1 || coins > 1000000000) return;
+        seenTopupIds[id] = true;
+        out.topups.push({ id: id, price: Math.round(price * 100) / 100, coins: coins });
+      });
+    }
 
     if (Array.isArray(raw.tiers) && raw.tiers.length) {
       out.tiers = raw.tiers.map(function (t, i) {
@@ -1539,6 +1600,89 @@
     });
   }
 
+  var TOPUP_MAX = 20;
+  function newTopupId() {
+    return "topup_" + Date.now().toString(36) + "_" + Math.floor(Math.random() * 46656).toString(36);
+  }
+
+  function renderTopups() {
+    var box = $("topupRows");
+    box.innerHTML = "";
+    $("tagTopup").textContent = cfg.topups.length + " 个套餐";
+    $("btnAddTopup").disabled = cfg.topups.length >= TOPUP_MAX;
+
+    if (!cfg.topups.length) {
+      var empty = document.createElement("div");
+      empty.className = "topup-empty";
+      empty.textContent = "当前没有充值套餐，游戏内充值入口已关闭。";
+      box.appendChild(empty);
+      return;
+    }
+
+    cfg.topups.forEach(function (item, index) {
+      var row = document.createElement("div");
+      row.className = "topup-row";
+
+      var number = document.createElement("span");
+      number.className = "topup-index";
+      number.textContent = String(index + 1).padStart(2, "0");
+
+      function makeField(labelText, value, options, commit) {
+        var field = document.createElement("div");
+        field.className = "field";
+        var label = document.createElement("label");
+        var input = document.createElement("input");
+        var inputId = "topup-" + item.id + "-" + options.name;
+        label.htmlFor = inputId;
+        label.textContent = labelText;
+        input.id = inputId;
+        input.type = "number";
+        input.min = options.min;
+        input.max = options.max;
+        input.step = options.step;
+        input.inputMode = options.step === "1" ? "numeric" : "decimal";
+        input.value = value;
+        input.onchange = function () {
+          var next = Number(input.value);
+          if (!isFinite(next) || next < Number(options.min) || next > Number(options.max)) {
+            toast(labelText + "超出允许范围", "err"); renderAll(); return;
+          }
+          if (options.integer && !Number.isSafeInteger(next)) {
+            toast(labelText + "必须是整数", "err"); renderAll(); return;
+          }
+          commit(next);
+          touch(); renderAll();
+        };
+        field.appendChild(label);
+        field.appendChild(input);
+        return field;
+      }
+
+      var priceField = makeField("参考价格（RM）", item.price.toFixed(2), { name: "price", min: "0.01", max: "1000000", step: "0.01" }, function (value) {
+        item.price = Math.round(value * 100) / 100;
+      });
+      var coinsField = makeField("虚拟金币数量", String(item.coins), { name: "coins", min: "1", max: "1000000000", step: "1", integer: true }, function (value) {
+        item.coins = value;
+      });
+      var remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "btn btn-danger topup-delete";
+      remove.textContent = "删除套餐";
+      remove.setAttribute("aria-label", "删除第 " + (index + 1) + " 个充值套餐");
+      remove.onclick = function () {
+        cfg.topups.splice(index, 1);
+        touch(); renderAll();
+        toast("已删除充值套餐 — 记得保存并应用");
+      };
+
+      row.appendChild(number);
+      row.appendChild(priceField);
+      row.appendChild(coinsField);
+      row.appendChild(remove);
+      box.appendChild(row);
+    });
+  }
+
   function renderGauge() {
     var t = tier();
     var a = analyse(t, cfg.odds, true);
@@ -1807,6 +1951,17 @@
     }
     var bad = cfg.tiers.filter(function (t) { return !t.prizePool.length || !t.multipliers.length || t.cost <= 0; });
     if (bad.length) { toast("有票种的奖金池 / 倍数池为空或票价无效", "err"); return; }
+    if (!Array.isArray(cfg.topups) || cfg.topups.length > TOPUP_MAX) { toast("充值套餐最多只能有 " + TOPUP_MAX + " 个", "err"); return; }
+    var seenTopupIds = {};
+    var invalidTopup = cfg.topups.some(function (item) {
+      var id = String(item.id || "").toLowerCase();
+      var invalid = !/^[a-z0-9_-]{1,40}$/i.test(id) || seenTopupIds[id] ||
+        !isFinite(item.price) || item.price < 0.01 || item.price > 1000000 || Math.abs(item.price * 100 - Math.round(item.price * 100)) > 0.00000001 ||
+        !Number.isSafeInteger(item.coins) || item.coins < 1 || item.coins > 1000000000;
+      seenTopupIds[id] = true;
+      return invalid;
+    });
+    if (invalidTopup) { toast("充值套餐含有无效或重复的价格 / 金币数据", "err"); return; }
     cfg.updatedAt = Date.now();
     var expectedVersion = draftBaseVersion === null ? remoteVersion : draftBaseVersion;
     try {
@@ -2053,6 +2208,18 @@
     toast("已删除票种「" + name + "」 — 记得点「保存并应用」");
   };
 
+  $("btnAddTopup").onclick = function () {
+    if (cfg.topups.length >= TOPUP_MAX) { toast("最多 " + TOPUP_MAX + " 个充值套餐", "err"); return; }
+    cfg.topups.push({ id: newTopupId(), price: 5, coins: 5000 });
+    touch(); renderAll();
+    var rows = $("topupRows").querySelectorAll(".topup-row");
+    var row = rows[rows.length - 1];
+    if (row && row.scrollIntoView) row.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    var priceInput = row && row.querySelector("input");
+    if (priceInput) { priceInput.focus(); priceInput.select(); }
+    toast("已新增充值套餐 — 修改价格和金币后保存并应用");
+  };
+
   // ---------- set a target RTP by scaling the prize pool ----------
   function applyTargetRtp() {
     var t = tier();
@@ -2099,6 +2266,7 @@
     renderQuick();
     renderFields();
     renderOdds();
+    renderTopups();
     renderGauge();
     renderOverview();
     renderDirty();
