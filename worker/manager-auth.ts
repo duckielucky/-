@@ -7,6 +7,14 @@ const LOGIN_BODY_LIMIT_BYTES = 4 * 1024;
 const MIN_MANAGER_TOKEN_BYTES = 32;
 const MAX_MANAGER_TOKEN_BYTES = 4 * 1024;
 const MIN_MANAGER_PASSWORD_BYTES = 8;
+const MANAGER_PASSWORD_PATH = "/api/manager/password";
+const MIN_CHANGED_PASSWORD_LENGTH = 10;
+const MAX_CHANGED_PASSWORD_LENGTH = 128;
+const PASSWORD_SALT_BYTES = 16;
+const PASSWORD_HASH_BYTES = 32;
+const PASSWORD_HASH_ALGORITHM = "hmac-sha256-v1";
+const PASSWORD_HASH_CONTEXT = "Lucky manager password hash\u0000v1\u0000";
+const MANAGER_SECRET_KEY = "manager";
 const KEY_DERIVATION_CONTEXT = "Lucky manager session signing key\u0000v1";
 const SIGNATURE_CONTEXT = "Lucky manager session cookie\u0000v1\u0000";
 const encoder = new TextEncoder();
@@ -30,6 +38,7 @@ function canonicalPathname(pathname: string): string | null {
 export type ManagerAuthEnv = {
   MANAGER_TOKEN?: string;
   MANAGER_PASSWORD?: string;
+  DB?: D1Database;
 };
 
 export type ManagerSession = {
@@ -300,9 +309,149 @@ async function readLoginCredential(request: Request): Promise<string | null> {
   }
 }
 
+const CREATE_MANAGER_SECRET_TABLE = `
+  CREATE TABLE IF NOT EXISTS manager_secret (
+    key TEXT PRIMARY KEY NOT NULL,
+    hash TEXT NOT NULL,
+    salt TEXT NOT NULL,
+    algorithm TEXT NOT NULL,
+    updated_at INTEGER NOT NULL
+  ) WITHOUT ROWID
+`;
+let managerSecretSchemaReady: Promise<void> | null = null;
+
+async function ensureManagerSecretTable(db: D1Database): Promise<void> {
+  if (!managerSecretSchemaReady) {
+    managerSecretSchemaReady = db.prepare(CREATE_MANAGER_SECRET_TABLE).run().then(() => undefined).catch((cause) => {
+      managerSecretSchemaReady = null;
+      throw cause;
+    });
+  }
+  await managerSecretSchemaReady;
+}
+
+type StoredManagerPassword = { hash: string; salt: string; algorithm: string };
+
+async function readStoredManagerPassword(db: D1Database): Promise<StoredManagerPassword | null> {
+  await ensureManagerSecretTable(db);
+  return db.prepare("SELECT hash, salt, algorithm FROM manager_secret WHERE key = ?1")
+    .bind(MANAGER_SECRET_KEY)
+    .first<StoredManagerPassword>();
+}
+
+async function derivePasswordHash(password: string, salt: Uint8Array, managerToken: string): Promise<Uint8Array> {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(managerToken),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const payload = PASSWORD_HASH_CONTEXT + bytesToBase64Url(salt) + "\u0000" + password;
+  return new Uint8Array(await crypto.subtle.sign("HMAC", key, encoder.encode(payload)));
+}
+
+function constantTimeEqual(left: Uint8Array, right: Uint8Array): boolean {
+  if (left.length !== right.length) return false;
+  let mismatch = 0;
+  for (let index = 0; index < left.length; index += 1) mismatch |= left[index] ^ right[index];
+  return mismatch === 0;
+}
+
+async function storedManagerPasswordMatches(candidate: string, row: StoredManagerPassword, managerToken: string): Promise<boolean> {
+  if (row.algorithm !== PASSWORD_HASH_ALGORITHM) return false;
+  const salt = base64UrlToBytes(row.salt, 64);
+  const expected = base64UrlToBytes(row.hash, 128);
+  if (!salt || salt.byteLength !== PASSWORD_SALT_BYTES || !expected || expected.byteLength !== PASSWORD_HASH_BYTES) return false;
+  const candidateHash = await derivePasswordHash(candidate, salt, managerToken);
+  return constantTimeEqual(candidateHash, expected);
+}
+
+async function storeManagerPassword(db: D1Database, password: string, managerToken: string): Promise<void> {
+  await ensureManagerSecretTable(db);
+  const salt = new Uint8Array(PASSWORD_SALT_BYTES);
+  crypto.getRandomValues(salt);
+  const hash = await derivePasswordHash(password, salt, managerToken);
+  await db.prepare(
+    "INSERT INTO manager_secret (key, hash, salt, algorithm, updated_at) VALUES (?1, ?2, ?3, ?4, ?5) "
+    + "ON CONFLICT(key) DO UPDATE SET hash = excluded.hash, salt = excluded.salt, algorithm = excluded.algorithm, updated_at = excluded.updated_at",
+  ).bind(MANAGER_SECRET_KEY, bytesToBase64Url(hash), bytesToBase64Url(salt), PASSWORD_HASH_ALGORITHM, Date.now()).run();
+}
+
+/**
+ * Verify a login credential. A password set via "change password" is stored in
+ * D1 and is authoritative. The strong MANAGER_TOKEN remains a break-glass
+ * recovery credential, while MANAGER_PASSWORD is only the initial password.
+ */
+async function verifyLoginCredential(candidate: string, env: ManagerAuthEnv): Promise<boolean> {
+  const recoveryToken = configuredManagerToken(env);
+  if (env.DB) {
+    try {
+      const stored = await readStoredManagerPassword(env.DB);
+      if (stored) {
+        const [storedMatches, recoveryMatches] = await Promise.all([
+          recoveryToken ? storedManagerPasswordMatches(candidate, stored, recoveryToken) : Promise.resolve(false),
+          recoveryToken ? managerTokenMatches(candidate, recoveryToken) : Promise.resolve(false),
+        ]);
+        return storedMatches || recoveryMatches;
+      }
+    } catch {
+      // Never reactivate the old password during a storage outage. Only the
+      // strong signing token may be used as the recovery credential.
+      return recoveryToken ? managerTokenMatches(candidate, recoveryToken) : false;
+    }
+  }
+  const managerPassword = configuredManagerPassword(env);
+  if (!managerPassword) return false;
+  return managerTokenMatches(candidate, managerPassword);
+}
+
+async function readPasswordChange(request: Request): Promise<{ currentPassword: string; newPassword: string } | null> {
+  const contentType = (request.headers.get("content-type") || "").split(";", 1)[0].trim().toLowerCase();
+  if (contentType !== "application/json") return null;
+  const contentLength = request.headers.get("content-length");
+  if (contentLength !== null && (!/^\d+$/.test(contentLength.trim()) || Number(contentLength) > LOGIN_BODY_LIMIT_BYTES)) return null;
+  const raw = await readBodyWithinLimit(request, LOGIN_BODY_LIMIT_BYTES);
+  if (raw === null) return null;
+  try {
+    const body = JSON.parse(raw) as unknown;
+    if (!body || typeof body !== "object" || Array.isArray(body)) return null;
+    const currentPassword = (body as { currentPassword?: unknown }).currentPassword;
+    const newPassword = (body as { newPassword?: unknown }).newPassword;
+    if (typeof currentPassword !== "string" || typeof newPassword !== "string") return null;
+    return { currentPassword, newPassword };
+  } catch {
+    return null;
+  }
+}
+
+async function handleManagerPasswordChange(request: Request, env: ManagerAuthEnv): Promise<Response> {
+  if (request.method !== "POST") return authJson({ error: "Method not allowed" }, 405, { allow: "POST" });
+  const originError = strictSameOriginError(request);
+  if (originError) return originError;
+  const managerToken = configuredManagerToken(env);
+  if (!managerToken) return authError("Manager authentication is not configured", 503);
+  if (!(await verifyManagerSession(request, env))) return authError("Manager session is invalid or expired", 401);
+  if (!env.DB) return authError("Password storage is unavailable", 503);
+  const body = await readPasswordChange(request);
+  if (body === null) return authError("The request is invalid", 400);
+  if (!(await verifyLoginCredential(body.currentPassword, env))) return authError("The current password is incorrect", 401);
+  if (body.newPassword.length < MIN_CHANGED_PASSWORD_LENGTH || body.newPassword.length > MAX_CHANGED_PASSWORD_LENGTH) {
+    return authError(`The new password must be ${MIN_CHANGED_PASSWORD_LENGTH}-${MAX_CHANGED_PASSWORD_LENGTH} characters`, 422);
+  }
+  if (body.newPassword === body.currentPassword) return authError("The new password must differ from the current one", 422);
+  try {
+    await storeManagerPassword(env.DB, body.newPassword, managerToken);
+  } catch {
+    return authError("Could not save the new password. Try again.", 503);
+  }
+  return authJson({ ok: true });
+}
+
 export async function handleManagerAuthApi(request: Request, env: ManagerAuthEnv): Promise<Response | null> {
   const pathname = canonicalPathname(new URL(request.url).pathname);
   if (pathname === null) return authError("The request path is invalid", 400);
+  if (pathname === MANAGER_PASSWORD_PATH) return handleManagerPasswordChange(request, env);
   if (pathname !== MANAGER_SESSION_PATH) return null;
 
   if (request.method === "GET") {
@@ -322,7 +471,7 @@ export async function handleManagerAuthApi(request: Request, env: ManagerAuthEnv
     if (!managerToken || !managerPassword) return authError("Manager authentication is not configured", 503);
     const candidate = await readLoginCredential(request);
     if (candidate === null) return authError("The login request is invalid", 400);
-    if (!(await managerTokenMatches(candidate, managerPassword))) return authError("Manager credentials are invalid", 401);
+    if (!(await verifyLoginCredential(candidate, env))) return authError("Manager credentials are invalid", 401);
     const { value, session } = await issueManagerSession(request, managerToken);
     return authJson(
       { authenticated: true, expiresAt: session.expiresAt },
