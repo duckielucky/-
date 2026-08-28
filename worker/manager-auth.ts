@@ -1,5 +1,6 @@
 const MANAGER_SESSION_PATH = "/api/manager/session";
 const MANAGER_LOGIN_PATH = "/manager-login.html";
+const MANAGER_USERNAME = "Admin";
 const MANAGER_PAGE_PATHS = new Set(["/manager", "/manager/", "/manager.html"]);
 const MANAGER_COOKIE = "__Host-lucky-manager-session";
 const SESSION_TTL_SECONDS = 8 * 60 * 60;
@@ -290,7 +291,7 @@ async function readBodyWithinLimit(request: Request, limit: number): Promise<str
   return result + bodyDecoder.decode();
 }
 
-async function readLoginCredential(request: Request): Promise<string | null> {
+async function readLoginCredentials(request: Request): Promise<{ username: string; password: string } | null> {
   const contentType = (request.headers.get("content-type") || "").split(";", 1)[0].trim().toLowerCase();
   if (contentType !== "application/json") return null;
   const contentLength = request.headers.get("content-length");
@@ -302,8 +303,11 @@ async function readLoginCredential(request: Request): Promise<string | null> {
   try {
     const body = JSON.parse(raw) as unknown;
     if (!body || typeof body !== "object" || Array.isArray(body)) return null;
+    const username = (body as { username?: unknown }).username;
     const password = (body as { password?: unknown }).password;
-    return typeof password === "string" ? password : null;
+    return typeof username === "string" && typeof password === "string"
+      ? { username: username.trim(), password }
+      : null;
   } catch {
     return null;
   }
@@ -460,7 +464,7 @@ export async function handleManagerAuthApi(request: Request, env: ManagerAuthEnv
     if (!session) {
       return authJson({ authenticated: false }, 401, { "set-cookie": expiredSessionCookie() });
     }
-    return authJson({ authenticated: true, expiresAt: session.expiresAt });
+    return authJson({ authenticated: true, username: MANAGER_USERNAME, expiresAt: session.expiresAt });
   }
 
   if (request.method === "POST") {
@@ -469,12 +473,15 @@ export async function handleManagerAuthApi(request: Request, env: ManagerAuthEnv
     const managerToken = configuredManagerToken(env);
     const managerPassword = configuredManagerPassword(env);
     if (!managerToken || !managerPassword) return authError("Manager authentication is not configured", 503);
-    const candidate = await readLoginCredential(request);
-    if (candidate === null) return authError("The login request is invalid", 400);
-    if (!(await verifyLoginCredential(candidate, env))) return authError("Manager credentials are invalid", 401);
+    const credentials = await readLoginCredentials(request);
+    if (credentials === null) return authError("The login request is invalid", 400);
+    if (
+      credentials.username.toLowerCase() !== MANAGER_USERNAME.toLowerCase()
+      || !(await verifyLoginCredential(credentials.password, env))
+    ) return authError("Manager credentials are invalid", 401);
     const { value, session } = await issueManagerSession(request, managerToken);
     return authJson(
-      { authenticated: true, expiresAt: session.expiresAt },
+      { authenticated: true, username: MANAGER_USERNAME, expiresAt: session.expiresAt },
       200,
       { "set-cookie": sessionCookie(value) },
     );
