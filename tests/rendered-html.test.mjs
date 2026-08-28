@@ -3,6 +3,7 @@ import { access, readFile } from "node:fs/promises";
 import test from "node:test";
 
 const API_ORIGIN = "http://localhost";
+const MANAGER_USERNAME = "Admin";
 const MANAGER_PASSWORD = "Test1234";
 const MANAGER_SESSION_SECRET = "unit-test-manager-session-secret-2026-08-25";
 const MANAGER_COOKIE_NAME = "__Host-lucky-manager-session";
@@ -76,11 +77,11 @@ function sameOriginHeaders(extra = {}) {
   return { origin: API_ORIGIN, "sec-fetch-site": "same-origin", ...extra };
 }
 
-async function managerLogin(db, password = MANAGER_PASSWORD) {
+async function managerLogin(db, password = MANAGER_PASSWORD, username = MANAGER_USERNAME) {
   return apiFetch(db, "/api/manager/session", {
     method: "POST",
     headers: sameOriginHeaders({ "content-type": "application/json" }),
-    body: JSON.stringify({ password }),
+    body: JSON.stringify({ username, password }),
   });
 }
 
@@ -94,6 +95,7 @@ const VALID_CONFIG = {
   schemaVersion: 1,
   updatedAt: 0,
   multiplierMinLevel: 3,
+  economy: { coinsPerToken: 50, myrPerToken: 1 },
   odds: { m0: 0.45, m1: 0.33, m2: 0.16, m3: 0.06 },
   topups: [
     { id: "starter", price: 4.9, coins: 5000 },
@@ -151,7 +153,7 @@ test("ships the game systems and installable assets", async () => {
   assert.match(page, /confirmDemoTopup/);
   assert.match(page, /panel\("topup"\)|setPanel\("topup"\)/);
   assert.match(page, /不会真实扣款/);
-  assert.match(page, /金币只保存在本设备/);
+  assert.match(page, /代币只保存在本设备/);
   assert.match(page, /currentPackage\.price !== selectedTopup\.price/);
   assert.match(page, /setAttribute\("inert", ""\)/);
   assert.match(page, /topupConfirmRef/);
@@ -172,14 +174,24 @@ test("ships the game systems and installable assets", async () => {
   assert.match(manager, /id="btnChangePw"/);
   assert.match(manager, /id="btnAddTopup"/);
   assert.match(manager, /id="topupRows"/);
+  assert.match(manager, /id="fMyrPerToken"/);
+  assert.match(manager, /id="fCoinsPerToken"/);
+  assert.match(manager, /id="playerLookup"[^>]*value="testplayer"/);
+  assert.match(manager, /id="playerWon"/);
+  assert.match(manager, /id="playerSpent"/);
+  assert.match(manager, /id="playerLog"/);
+  assert.match(manager, /仅此浏览器/);
+  assert.match(manager, /PLAYER_SAVE_PREFIX \+ username/);
+  assert.match(manager, /detail\.textContent = labels\[entry\.k\]/);
   assert.match(manager, /删除套餐/);
   assert.match(manager, /\/api\/manager\/session/);
   assert.match(manager, /\/api\/manager\/password/);
   assert.match(manager, /method:\s*"DELETE"/);
   assert.match(manager, /credentials:\s*"same-origin"/);
   assert.match(managerLoginPage, /id="loginForm"/);
+  assert.match(managerLoginPage, /id="username"[^>]*value="Admin"[^>]*autocomplete="username"/);
   assert.match(managerLoginPage, /\/api\/manager\/session/);
-  assert.match(managerLoginPage, /JSON\.stringify\(\{\s*password:\s*password\.value\s*\}\)/);
+  assert.match(managerLoginPage, /JSON\.stringify\(\{\s*username:\s*username\.value\.trim\(\),\s*password:\s*password\.value\s*\}\)/);
   assert.match(managerLoginPage, /credentials:\s*"same-origin"/);
   const managerAuthHtml = `${manager}\n${managerLoginPage}`;
   assert.doesNotMatch(managerAuthHtml, /\bprompt\b/i);
@@ -191,7 +203,7 @@ test("ships the game systems and installable assets", async () => {
   assert.match(serviceWorker, /caches\.open\(CACHE\)/);
   assert.match(serviceWorker, /pathname\.startsWith\("\/api\/"\)/);
   assert.match(serviceWorker, /canonicalPathname/);
-  assert.match(serviceWorker, /const CACHE = "lucky-scratch-v11"/);
+  assert.match(serviceWorker, /const CACHE = "lucky-scratch-v12"/);
   assert.match(serviceWorker, /pathname === "\/manager\/"/);
   assert.match(serviceWorker, /pathname === "\/manager-login\/"/);
   assert.match(serviceWorker, /pathname === "\/manager-login\.html"/);
@@ -219,7 +231,8 @@ test("removes the daily reward claim while preserving legacy history support", a
   assert.doesNotMatch(page, /\bclaimDaily\b|\bdailyAvailable\b|领取每日奖励|每日礼包|每日奖励/);
   assert.match(page, /className="stat-button stat-balance"/);
   assert.match(page, /setPanel\("topup"\)/);
-  assert.match(page, /<span>余额 · 充值<\/span><strong><i className="coin-dot" \/>\{formatCoins\(player\.coins\)\}<\/strong>/);
+  assert.match(page, /<span>代币余额 · 充值<\/span>/);
+  assert.match(page, /formatTokens/);
   assert.match(profile, /daily:\s*\{[^}]*每日奖励/s);
   assert.match(profile, /topup:\s*\{[^}]*演示充值（未扣款）/s);
 });
@@ -239,10 +252,15 @@ test("creates, checks, and expires an HttpOnly signed manager session", async ()
   assert.equal(noPassword.status, 400);
   assert.equal(noPassword.headers.get("set-cookie"), null);
 
+  const wrongUsername = await managerLogin(db, MANAGER_PASSWORD, "NotAdmin");
+  assert.equal(wrongUsername.status, 401);
+  assert.equal(wrongUsername.headers.get("set-cookie"), null);
+
   const loggedIn = await managerLogin(db);
   assert.equal(loggedIn.status, 200);
   const loggedInBody = await loggedIn.clone().json();
   assert.equal(loggedInBody.authenticated, true);
+  assert.equal(loggedInBody.username, MANAGER_USERNAME);
   assert.equal(Number.isSafeInteger(loggedInBody.expiresAt), true);
 
   const { setCookie, cookie } = readSessionCookie(loggedIn);
@@ -261,6 +279,7 @@ test("creates, checks, and expires an HttpOnly signed manager session", async ()
   assert.equal(session.status, 200);
   const sessionBody = await session.json();
   assert.equal(sessionBody.authenticated, true);
+  assert.equal(sessionBody.username, MANAGER_USERNAME);
   assert.equal(sessionBody.expiresAt, loggedInBody.expiresAt);
 
   const noSession = await apiFetch(db, "/api/manager/session");
@@ -287,21 +306,21 @@ test("keeps a strong signing secret separate from the manager password", async (
   const shortSigningSecret = await apiFetch(db, "/api/manager/session", {
     method: "POST",
     headers: sameOriginHeaders({ "content-type": "application/json" }),
-    body: JSON.stringify({ password: MANAGER_PASSWORD }),
+    body: JSON.stringify({ username: MANAGER_USERNAME, password: MANAGER_PASSWORD }),
   }, { MANAGER_TOKEN: "too-short" });
   assert.equal(shortSigningSecret.status, 503);
 
   const shortPassword = await apiFetch(db, "/api/manager/session", {
     method: "POST",
     headers: sameOriginHeaders({ "content-type": "application/json" }),
-    body: JSON.stringify({ password: "1234567" }),
+    body: JSON.stringify({ username: MANAGER_USERNAME, password: "1234567" }),
   }, { MANAGER_PASSWORD: "1234567" });
   assert.equal(shortPassword.status, 503);
 
   const legacyFallback = await apiFetch(db, "/api/manager/session", {
     method: "POST",
     headers: sameOriginHeaders({ "content-type": "application/json" }),
-    body: JSON.stringify({ password: MANAGER_SESSION_SECRET }),
+    body: JSON.stringify({ username: MANAGER_USERNAME, password: MANAGER_SESSION_SECRET }),
   }, { MANAGER_PASSWORD: undefined });
   assert.equal(legacyFallback.status, 200);
 });
@@ -422,6 +441,7 @@ test("protects config writes with the signed session while keeping config reads 
   assert.equal(first.version, 1);
   assert.equal(first.config.updatedAt, first.updatedAt);
   assert.deepEqual(first.config.topups, VALID_CONFIG.topups);
+  assert.deepEqual(first.config.economy, VALID_CONFIG.economy);
 
   const stale = await apiFetch(db, "/api/config", {
     method: "PUT",
@@ -439,6 +459,7 @@ test("protects config writes with the signed session while keeping config reads 
   const updatedBody = await updated.json();
   assert.equal(updatedBody.version, 2);
   assert.deepEqual(updatedBody.config.topups, [{ id: "mega", price: 49.9, coins: 80000 }]);
+  assert.deepEqual(updatedBody.config.economy, VALID_CONFIG.economy);
 
   const disabledTopups = await apiFetch(db, "/api/config", {
     method: "PUT",
@@ -474,7 +495,7 @@ test("protects config writes with the signed session while keeping config reads 
   const crossOriginLogin = await apiFetch(db, "/api/manager/session", {
     method: "POST",
     headers: { "content-type": "application/json", origin: "https://example.com", "sec-fetch-site": "cross-site" },
-    body: JSON.stringify({ password: MANAGER_PASSWORD }),
+    body: JSON.stringify({ username: MANAGER_USERNAME, password: MANAGER_PASSWORD }),
   });
   assert.equal(crossOriginLogin.status, 403);
 
@@ -566,4 +587,58 @@ test("validates top-up packages and preserves them for legacy manager writes", a
   });
   assert.equal(legacyCreate.status, 200);
   assert.equal((await legacyCreate.json()).config.topups.length > 0, true);
+});
+
+test("validates token economy settings and preserves them for legacy manager writes", async () => {
+  const db = createConfigDb();
+  const login = await managerLogin(db);
+  const { cookie } = readSessionCookie(login);
+  const configured = { ...VALID_CONFIG, economy: { coinsPerToken: 40, myrPerToken: 1.25 } };
+  const created = await apiFetch(db, "/api/config", {
+    method: "PUT",
+    headers: sameOriginHeaders({ "content-type": "application/json", cookie }),
+    body: JSON.stringify({ config: configured, expectedVersion: 0 }),
+  });
+  assert.equal(created.status, 200);
+  assert.deepEqual((await created.json()).config.economy, configured.economy);
+
+  const legacyConfig = { ...VALID_CONFIG };
+  delete legacyConfig.economy;
+  const preserved = await apiFetch(db, "/api/config", {
+    method: "PUT",
+    headers: sameOriginHeaders({ "content-type": "application/json", cookie }),
+    body: JSON.stringify({ config: legacyConfig, expectedVersion: 1 }),
+  });
+  assert.equal(preserved.status, 200);
+  assert.deepEqual((await preserved.json()).config.economy, configured.economy);
+
+  const invalidEconomies = [
+    null,
+    { coinsPerToken: 0, myrPerToken: 1 },
+    { coinsPerToken: 1.5, myrPerToken: 1 },
+    { coinsPerToken: 50, myrPerToken: 0 },
+    { coinsPerToken: 50, myrPerToken: 1.001 },
+    { coinsPerToken: 1000001, myrPerToken: 1 },
+    { coinsPerToken: 50, myrPerToken: "1" },
+  ];
+  for (const economy of invalidEconomies) {
+    const response = await apiFetch(db, "/api/config", {
+      method: "PUT",
+      headers: sameOriginHeaders({ "content-type": "application/json", cookie }),
+      body: JSON.stringify({ config: { ...VALID_CONFIG, economy }, expectedVersion: 2 }),
+    });
+    assert.equal(response.status, 422, JSON.stringify(economy));
+  }
+
+  const freshDb = createConfigDb();
+  const freshCookie = readSessionCookie(await managerLogin(freshDb)).cookie;
+  const missingEconomy = { ...VALID_CONFIG };
+  delete missingEconomy.economy;
+  const legacyCreate = await apiFetch(freshDb, "/api/config", {
+    method: "PUT",
+    headers: sameOriginHeaders({ "content-type": "application/json", cookie: freshCookie }),
+    body: JSON.stringify({ config: missingEconomy, expectedVersion: 0 }),
+  });
+  assert.equal(legacyCreate.status, 200);
+  assert.deepEqual((await legacyCreate.json()).config.economy, { coinsPerToken: 50, myrPerToken: 1 });
 });

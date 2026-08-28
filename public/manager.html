@@ -327,10 +327,28 @@
   .topup-delete{min-height:38px;align-self:end}
   .topup-empty{padding:24px 14px;border:1px dashed var(--line-strong);border-radius:12px;color:var(--dim);font-size:12px;line-height:1.65;text-align:center}
   .topup-hint{margin:11px 0 0;color:var(--dim);font-size:11px;line-height:1.6}
+  .economy-summary{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+  .economy-summary span{padding:8px 11px;border:1px solid var(--line);border-radius:10px;background:var(--panel-2);color:var(--muted);font-size:11px}
+  .economy-summary b{color:var(--ink)}
+  .player-report-controls{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:end}
+  .player-report-meta{margin:10px 0 0;color:var(--dim);font-size:11px;line-height:1.55}
+  .player-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;margin-top:14px;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--line)}
+  .player-stats div{display:grid;gap:5px;padding:12px;background:var(--panel)}
+  .player-stats span{color:var(--dim);font-size:10px}
+  .player-stats b{font-family:var(--mono);font-size:15px;overflow-wrap:anywhere}
+  .player-log{display:grid;gap:8px;margin-top:14px}
+  .player-log-row{display:grid;grid-template-columns:88px minmax(0,1fr) auto;gap:10px;align-items:center;padding:10px 11px;border:1px solid var(--line);border-radius:10px;background:var(--panel-2);font-size:11px}
+  .player-log-row time{color:var(--dim);font-family:var(--mono)}
+  .player-log-row span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .player-log-row b{font-family:var(--mono);white-space:nowrap}
+  .player-log-empty{padding:20px;border:1px dashed var(--line-strong);border-radius:10px;color:var(--dim);font-size:12px;text-align:center}
   .btn:disabled{opacity:.45;cursor:not-allowed}
   @media (max-width:620px){
     .topup-row{grid-template-columns:32px 1fr auto}
     .topup-row .field:nth-of-type(2){grid-column:2/4}
+    .player-stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .player-log-row{grid-template-columns:74px minmax(0,1fr);gap:7px}
+    .player-log-row b{grid-column:2}
   }
 
   /* ---------- odds ---------- */
@@ -766,6 +784,7 @@
     <div class="brand-mark" id="brandMark">✦</div>
     <div>
       <h1>幸运刮刮乐 · 运营后台</h1>
+      <p id="managerIdentity">Admin</p>
       <button class="info" type="button" data-help="guide" aria-label="使用说明" style="margin-top:5px">i</button>
     </div>
   </div>
@@ -843,8 +862,8 @@
       <div class="sec-head"><h2>票种参数</h2><button class="btn btn-danger" id="btnDelTier" type="button" style="margin-left:auto;padding:5px 11px;font-size:12px">删除此票种</button><button class="info" type="button" data-help="tier" aria-label="票种参数怎么用" style="margin-left:8px">i</button></div>
       <div class="grid">
         <div class="field">
-          <label for="fCost">票价 <em>（金币）</em></label>
-          <input type="number" id="fCost" min="1" step="1" />
+          <label for="fCost">票价 <em>（代币）</em></label>
+          <input type="number" id="fCost" min="0.01" step="0.01" />
           <div class="err" id="eCost"></div>
         </div>
         <div class="field">
@@ -879,6 +898,29 @@
       </div>
     </section>
 
+    <!-- 代币换算（全局） -->
+    <section class="card sec">
+      <div class="sec-head">
+        <h2>代币经济</h2>
+        <span class="tag">全局</span>
+        <button class="info" type="button" data-help="economy" aria-label="代币经济怎么用">i</button>
+      </div>
+      <div class="grid">
+        <div class="field">
+          <label for="fMyrPerToken">1 代币 = RM</label>
+          <input type="number" id="fMyrPerToken" min="0.01" max="1000000" step="0.01" />
+        </div>
+        <div class="field">
+          <label for="fCoinsPerToken">1 代币对应内部单位</label>
+          <input type="number" id="fCoinsPerToken" min="1" max="1000000" step="1" />
+        </div>
+      </div>
+      <div class="economy-summary">
+        <span>当前票种票价 <b id="tokenTicketPreview">—</b></span>
+        <span>参考价值 <b id="tokenMyrPreview">—</b></span>
+      </div>
+    </section>
+
     <!-- 中奖概率 -->
     <section class="card sec">
       <div class="sec-head">
@@ -898,7 +940,7 @@
       </div>
     </section>
 
-    <!-- 虚拟金币充值套餐（全局） -->
+    <!-- 虚拟代币充值套餐（全局） -->
     <section class="card sec">
       <div class="sec-head">
         <h2>充值套餐</h2>
@@ -909,7 +951,33 @@
         </span>
       </div>
       <div class="topup-list" id="topupRows"></div>
-      <p class="topup-hint">这里设置游戏内显示的参考价格与虚拟金币数量。当前版本为演示充值，不会真实扣款；删除全部套餐会关闭游戏内充值入口。</p>
+      <p class="topup-hint">这里设置游戏内显示的套餐价格与虚拟代币数量。当前版本为演示充值，不会真实扣款；删除全部套餐会关闭游戏内充值入口。</p>
+    </section>
+
+    <!-- 同一浏览器上的玩家记录 -->
+    <section class="card sec">
+      <div class="sec-head">
+        <h2>玩家记录</h2>
+        <span class="tag">仅此浏览器</span>
+        <button class="info" type="button" data-help="player" aria-label="玩家记录怎么用">i</button>
+      </div>
+      <div class="player-report-controls">
+        <div class="field">
+          <label for="playerLookup">玩家用户名</label>
+          <input id="playerLookup" type="text" value="testplayer" maxlength="20" autocomplete="off" autocapitalize="none" spellcheck="false" />
+        </div>
+        <button class="btn" id="btnPlayerLookup" type="button">读取记录</button>
+      </div>
+      <p class="player-report-meta" id="playerReportMeta">输入玩家用户名后读取本浏览器保存的游戏进度。不会显示密码或安全资料。</p>
+      <div class="player-stats" id="playerStats" hidden>
+        <div><span>代币余额</span><b id="playerBalance">—</b></div>
+        <div><span>已刮票数</span><b id="playerTickets">—</b></div>
+        <div><span>等级</span><b id="playerLevel">—</b></div>
+        <div><span>累计中奖</span><b id="playerWon">—</b></div>
+        <div><span>购票花费（虚拟）</span><b id="playerSpent">—</b></div>
+        <div><span>游戏净额</span><b id="playerNet">—</b></div>
+      </div>
+      <div class="player-log" id="playerLog"><div class="player-log-empty">尚未读取玩家记录</div></div>
     </section>
 
     <p class="foot">
@@ -963,9 +1031,9 @@
         <div><span>理论赔付率</span><b id="simTheory">—</b></div>
         <div><span>中奖票占比</span><b id="simHit">—</b></div>
         <div><span>玩家总花费（2万张）</span><b id="simSpend">—</b></div>
-        <div><span>总赔付金币</span><b id="simPayout">—</b></div>
+        <div><span>总赔付代币</span><b id="simPayout">—</b></div>
         <div><span>系统利益（净利润）</span><b id="simProfit">—</b></div>
-        <div><span>金币净流入 / 张</span><b id="simNet">—</b></div>
+        <div><span>代币净流入 / 张</span><b id="simNet">—</b></div>
       </div>
       <p class="sim-note" id="simNote"></p>
     </section>
@@ -1055,6 +1123,7 @@
       schemaVersion: SCHEMA_VERSION,
       updatedAt: 0,
       multiplierMinLevel: 3,
+      economy: { coinsPerToken: 50, myrPerToken: 1 },
       odds: { m0: 0.45, m1: 0.33, m2: 0.16, m3: 0.06 },
       topups: [
         { id: "starter", price: 4.9, coins: 5000 },
@@ -1105,6 +1174,19 @@
     if (Math.abs(n) >= 100000000) return (n / 100000000).toFixed(2) + " 亿";
     if (Math.abs(n) >= 10000) return (n / 10000).toFixed(n >= 1000000 ? 0 : 2) + " 万";
     return num(Math.round(n));
+  }
+  function tokensFromCoins(coins) {
+    var unit = cfg && cfg.economy && Number(cfg.economy.coinsPerToken);
+    return Number(coins) / (Number.isSafeInteger(unit) && unit > 0 ? unit : 50);
+  }
+  function tokenText(coins) {
+    var value = tokensFromCoins(coins);
+    return isFinite(value) ? value.toLocaleString("zh-CN", { maximumFractionDigits: 2 }) + " 代币" : "—";
+  }
+  function myrText(coins) {
+    var rate = cfg && cfg.economy ? Number(cfg.economy.myrPerToken) : 1;
+    var value = tokensFromCoins(coins) * (isFinite(rate) && rate > 0 ? rate : 1);
+    return isFinite(value) ? "RM " + value.toFixed(2) : "—";
   }
 
   // ---------- explainers, opened from the i icons ----------
@@ -1161,12 +1243,29 @@
       ]
     },
     topup: {
-      title: "充值套餐", sub: "游戏里展示多少参考价、发多少虚拟金币",
+      title: "充值套餐", sub: "游戏里展示多少套餐价格、发多少虚拟代币",
       body: [
-        { h: "这是全局设置", p: "充值套餐不属于某个票种。每个套餐包含一个 <b>RM 参考价格</b>和一个<b>虚拟金币数量</b>，所有设备都会读取同一份云端配置。" },
-        { h: "怎么改", p: "点<b>新增套餐</b>添加一行，直接修改参考价格或金币数量；点<b>删除套餐</b>移除。最多保留 20 个套餐，也可以全部删除来关闭游戏内充值入口。" },
+        { h: "这是全局设置", p: "充值套餐不属于某个票种。每个套餐包含一个 <b>RM 套餐价格</b>和一个<b>虚拟代币数量</b>，所有设备都会读取同一份云端配置；套餐可独立设置折扣或赠送数量。" },
+        { h: "怎么改", p: "点<b>新增套餐</b>添加一行，直接修改套餐价格或代币数量；点<b>删除套餐</b>移除。最多保留 20 个套餐，也可以全部删除来关闭游戏内充值入口。" },
         { h: "什么时候生效", p: "修改后必须点<b>保存并应用</b>。游戏会自动取得新配置，已经打开的设备通常会在 30 秒内刷新。" },
-        { warn: "当前是<b>演示充值</b>：不会调用支付平台、不会真实扣款，虚拟金币只写入玩家当前设备的本地存档。若以后接真实付款，必须另建服务端账户账本、支付回调和防重复入账机制。" }
+        { warn: "当前是<b>演示充值</b>：不会调用支付平台、不会真实扣款，虚拟代币只写入玩家当前设备的本地存档。若以后接真实付款，必须另建服务端账户账本、支付回调和防重复入账机制。" }
+      ]
+    },
+    economy: {
+      title: "代币经济", sub: "把现有整数账本换算成玩家看到的代币与 RM 参考值",
+      body: [
+        { h: "默认换算", p: "系统用整数内部单位结算，默认 <b>50 个内部单位 = 1 代币</b>。因此原本 500 单位的入门票会显示为 <b>10 代币</b>，不会改变余额、奖金、赔付率或旧记录。" },
+        { h: "票价怎么调", p: "选中票种后直接修改<b>票价（代币）</b>。后台会安全换算回整数单位保存；不同票种可以分别设置价格。" },
+        { h: "RM 参考值", p: "默认 <b>1 代币 = RM 1.00</b>。修改这个数字只改变后台与玩家记录里的参考换算，不会发起付款、提现或现金兑换。" },
+        { warn: "代币和 RM 都是演示/运营参考。游戏没有真实支付账本，不能把这些数字当成真实收费或可提现余额。" }
+      ]
+    },
+    player: {
+      title: "玩家记录", sub: "查看当前浏览器里某个本地玩家的进度",
+      body: [
+        { h: "能看到什么", p: "输入用户名后可查看本浏览器保存的余额、等级、票数、累计中奖、购票花费和最近记录。默认填写 <code>testplayer</code> 方便测试。" },
+        { h: "数据在哪里", p: "玩家账号与进度目前只保存在同一浏览器的本地存储，所以这里只能读取<b>这台设备</b>玩过的玩家。不会读取或显示密码、哈希或安全字段。" },
+        { warn: "这不是跨设备的正式玩家账本。若要查看所有真实玩家，必须把账号与交易记录迁移到受保护的云端数据库。" }
       ]
     },
     rtp: {
@@ -1276,6 +1375,12 @@
     }
     var lvl = Number(raw.multiplierMinLevel);
     if (isFinite(lvl) && lvl >= 1) out.multiplierMinLevel = Math.floor(lvl);
+    if (raw.economy && typeof raw.economy === "object") {
+      var coinsPerToken = Number(raw.economy.coinsPerToken);
+      var myrPerToken = Number(raw.economy.myrPerToken);
+      if (Number.isSafeInteger(coinsPerToken) && coinsPerToken >= 1 && coinsPerToken <= 1000000) out.economy.coinsPerToken = coinsPerToken;
+      if (isFinite(myrPerToken) && myrPerToken >= 0.01 && myrPerToken <= 1000000) out.economy.myrPerToken = Math.round(myrPerToken * 100) / 100;
+    }
 
     if (Array.isArray(raw.topups)) {
       out.topups = [];
@@ -1385,7 +1490,7 @@
       el.innerHTML =
         '<span class="tier-rtp" style="color:' + b.color + '">' + (isFinite(a.rtp) ? Math.round(a.rtp * 100) + "%" : "—") + "</span>" +
         "<b>" + esc(t.shortName) + "</b>" +
-        "<small>" + num(t.cost) + " 金币 · Lv." + t.unlockLevel + "</small>";
+        "<small>" + tokenText(t.cost) + " · Lv." + t.unlockLevel + "</small>";
       el.onclick = function () { active = i; renderAll(); };
       nav.insertBefore(el, addBtn);   // keep the “＋ 新增票种” button last
     });
@@ -1571,13 +1676,20 @@
 
   function renderFields() {
     var t = tier();
-    bindField("fCost", function () { return t.cost; }, function (v) { t.cost = v; }, "int");
+    bindField("fCost", function () { return Number((t.cost / cfg.economy.coinsPerToken).toFixed(2)); }, function (v) {
+      t.cost = Math.max(1, Math.round(v * cfg.economy.coinsPerToken));
+    }, "float");
     bindField("fUnlock", function () { return t.unlockLevel; }, function (v) { t.unlockLevel = v; }, "int");
     bindField("fName", function () { return t.name; }, function (v) { t.name = v; });
     bindField("fShort", function () { return t.shortName; }, function (v) { t.shortName = v; });
     bindField("fMaxLabel", function () { return t.maxLabel; }, function (v) { t.maxLabel = v; });
     bindField("fFeature", function () { return t.feature; }, function (v) { t.feature = v; });
     bindField("fMultLevel", function () { return cfg.multiplierMinLevel; }, function (v) { cfg.multiplierMinLevel = v; }, "int");
+    bindField("fCoinsPerToken", function () { return cfg.economy.coinsPerToken; }, function (v) { cfg.economy.coinsPerToken = v; }, "int");
+    bindField("fMyrPerToken", function () { return cfg.economy.myrPerToken; }, function (v) { cfg.economy.myrPerToken = Math.round(v * 100) / 100; }, "float");
+    var ticketTokens = t.cost / cfg.economy.coinsPerToken;
+    $("tokenTicketPreview").textContent = ticketTokens.toLocaleString("zh-CN", { maximumFractionDigits: 2 }) + " 代币";
+    $("tokenMyrPreview").textContent = "RM " + (ticketTokens * cfg.economy.myrPerToken).toFixed(2);
 
     var sp = $("fSpecial");
     sp.value = (t.specialChance * 100).toFixed(1);
@@ -1661,8 +1773,8 @@
       var priceField = makeField("参考价格（RM）", item.price.toFixed(2), { name: "price", min: "0.01", max: "1000000", step: "0.01" }, function (value) {
         item.price = Math.round(value * 100) / 100;
       });
-      var coinsField = makeField("虚拟金币数量", String(item.coins), { name: "coins", min: "1", max: "1000000000", step: "1", integer: true }, function (value) {
-        item.coins = value;
+      var coinsField = makeField("虚拟代币数量", String(Number(tokensFromCoins(item.coins).toFixed(2))), { name: "coins", min: "0.01", max: String(1000000000 / cfg.economy.coinsPerToken), step: "0.01" }, function (value) {
+        item.coins = Math.max(1, Math.round(value * cfg.economy.coinsPerToken));
       });
       var remove = document.createElement("button");
       remove.type = "button";
@@ -1682,6 +1794,101 @@
       box.appendChild(row);
     });
   }
+
+  var PLAYER_ACCOUNTS_KEY = "lucky_accounts_v1";
+  var PLAYER_SAVE_PREFIX = "lucky_save_v1::";
+  function safePlayerNumber(value) {
+    var number = Number(value);
+    return isFinite(number) && number >= 0 ? number : 0;
+  }
+  function playerAmountText(coins) {
+    return tokenText(coins) + " · " + myrText(coins);
+  }
+  function setPlayerReportEmpty(message) {
+    $("playerStats").hidden = true;
+    $("playerLog").innerHTML = "";
+    var empty = document.createElement("div");
+    empty.className = "player-log-empty";
+    empty.textContent = message;
+    $("playerLog").appendChild(empty);
+  }
+  function renderPlayerReport() {
+    var username = String($("playerLookup").value || "").trim().toLowerCase();
+    if (!/^[a-z0-9_]{3,20}$/i.test(username) || username === "__proto__" || username === "constructor" || username === "prototype") {
+      $("playerReportMeta").textContent = "请输入 3–20 位、只含字母数字或下划线的玩家用户名。";
+      setPlayerReportEmpty("用户名格式无效");
+      return;
+    }
+    var accounts;
+    var savedGame;
+    try {
+      var parsedAccounts = JSON.parse(localStorage.getItem(PLAYER_ACCOUNTS_KEY) || "{}");
+      accounts = parsedAccounts && typeof parsedAccounts === "object" && !Array.isArray(parsedAccounts) ? parsedAccounts : {};
+      var rawSave = localStorage.getItem(PLAYER_SAVE_PREFIX + username);
+      savedGame = rawSave ? JSON.parse(rawSave) : null;
+    } catch (e) {
+      $("playerReportMeta").textContent = "本浏览器里的玩家记录无法读取或已经损坏。";
+      setPlayerReportEmpty("无法解析本地玩家记录");
+      return;
+    }
+    var account = Object.prototype.hasOwnProperty.call(accounts, username) ? accounts[username] : null;
+    var player = savedGame && savedGame.player && typeof savedGame.player === "object" ? savedGame.player : null;
+    if (!account && !player) {
+      $("playerReportMeta").textContent = "本浏览器没有找到玩家「" + username + "」。请先在这台设备登录并玩一局。";
+      setPlayerReportEmpty("没有本机玩家数据");
+      return;
+    }
+
+    var balance = safePlayerNumber(player ? player.coins : account && account.coins);
+    var tickets = Math.floor(safePlayerNumber(player && player.ticketsPlayed));
+    var level = Math.max(1, Math.floor(safePlayerNumber(player && player.level) || 1));
+    var won = safePlayerNumber(player && player.totalWon);
+    var spent = safePlayerNumber(player && player.totalSpent);
+    var net = won - spent;
+    $("playerStats").hidden = false;
+    $("playerBalance").textContent = playerAmountText(balance);
+    $("playerTickets").textContent = num(tickets);
+    $("playerLevel").textContent = "Lv." + level;
+    $("playerWon").textContent = playerAmountText(won);
+    $("playerSpent").textContent = playerAmountText(spent);
+    $("playerNet").textContent = (net >= 0 ? "+" : "−") + playerAmountText(Math.abs(net));
+    $("playerNet").style.color = net >= 0 ? "var(--ok)" : "var(--danger)";
+    var displayName = account && typeof account.displayName === "string" ? account.displayName.trim() : "";
+    $("playerReportMeta").textContent = (displayName ? displayName + " · @" : "玩家 @") + username + " · 数据仅来自当前浏览器，可被本机用户修改。";
+
+    var log = player && Array.isArray(player.log) ? player.log.slice(0, 20) : [];
+    var labels = { buy: "购票", win: "中奖", daily: "旧版每日奖励", rescue: "救济", topup: "演示充值" };
+    $("playerLog").innerHTML = "";
+    log.forEach(function (entry) {
+      if (!entry || typeof entry !== "object" || !labels[entry.k]) return;
+      var amount = safePlayerNumber(entry.a);
+      var row = document.createElement("div");
+      row.className = "player-log-row";
+      var time = document.createElement("time");
+      var timestamp = Number(entry.t);
+      var date = isFinite(timestamp) && timestamp > 0 ? new Date(timestamp) : null;
+      time.textContent = date && !isNaN(date.getTime()) ? date.toLocaleDateString("zh-CN", { month: "2-digit", day: "2-digit" }) + " " + date.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" }) : "—";
+      var detail = document.createElement("span");
+      detail.textContent = labels[entry.k] + (typeof entry.n === "string" && entry.n.trim() ? " · " + entry.n.trim().slice(0, 80) : "");
+      var value = document.createElement("b");
+      var negative = entry.k === "buy";
+      value.textContent = (negative ? "−" : "+") + tokenText(amount);
+      value.style.color = negative ? "var(--danger)" : "var(--ok)";
+      row.appendChild(time); row.appendChild(detail); row.appendChild(value);
+      $("playerLog").appendChild(row);
+    });
+    if (!$("playerLog").children.length) {
+      var emptyLog = document.createElement("div");
+      emptyLog.className = "player-log-empty";
+      emptyLog.textContent = "这名玩家还没有游戏记录";
+      $("playerLog").appendChild(emptyLog);
+    }
+  }
+
+  $("btnPlayerLookup").onclick = renderPlayerReport;
+  $("playerLookup").onkeydown = function (event) {
+    if (event.key === "Enter") { event.preventDefault(); renderPlayerReport(); }
+  };
 
   function renderGauge() {
     var t = tier();
@@ -1705,19 +1912,19 @@
     $("moBand").style.color = b.color;
 
     $("bdMatch").textContent = a.matches.toFixed(3) + " 格";
-    $("bdPrize").textContent = compact(a.prize);
+    $("bdPrize").textContent = tokenText(a.prize);
     $("bdMult").textContent = "×" + a.mult.toFixed(3);
-    $("bdReturn").textContent = compact(a.ret);
-    $("bdCost").textContent = compact(t.cost);
+    $("bdReturn").textContent = tokenText(a.ret);
+    $("bdCost").textContent = tokenText(t.cost);
     var net = a.ret - t.cost;
-    $("bdNet").textContent = (net >= 0 ? "+" : "−") + compact(Math.abs(net));
+    $("bdNet").textContent = (net >= 0 ? "+" : "−") + tokenText(Math.abs(net));
     $("bdNet").style.color = net > 0 ? "var(--danger)" : "var(--ok)";
 
     $("tagPrize").textContent = t.prizePool.length + " 个奖金";
     $("tagMult").textContent = t.multipliers.length + " 个倍数";
-    $("prizeAvg").textContent = compact(mean(t.prizePool));
-    $("prizeMin").textContent = compact(Math.min.apply(null, t.prizePool));
-    $("prizeMax").textContent = compact(Math.max.apply(null, t.prizePool));
+    $("prizeAvg").textContent = tokenText(mean(t.prizePool));
+    $("prizeMin").textContent = tokenText(Math.min.apply(null, t.prizePool));
+    $("prizeMax").textContent = tokenText(Math.max.apply(null, t.prizePool));
     $("prizeMaxX").textContent = t.cost > 0 ? (Math.max.apply(null, t.prizePool) / t.cost).toFixed(1) + "×" : "—";
     $("multAvg").textContent = "×" + mean(t.multipliers).toFixed(2);
     $("multMax").textContent = "×" + Math.max.apply(null, t.multipliers);
@@ -1734,8 +1941,8 @@
       if (i === active) tr.className = "cur";
       tr.innerHTML =
         '<td><span class="dot" style="background:' + t.accent + '"></span>' + esc(t.shortName) + "</td>" +
-        "<td>" + compact(t.cost) + "</td>" +
-        "<td>" + compact(a.ret) + "</td>" +
+        "<td>" + tokenText(t.cost) + "</td>" +
+        "<td>" + tokenText(a.ret) + "</td>" +
         '<td style="color:' + b.color + ';font-weight:700">' + (isFinite(a.rtp) ? (a.rtp * 100).toFixed(0) + "%" : "—") + "</td>";
       body.appendChild(tr);
     });
@@ -1780,17 +1987,17 @@
       $("simRtp").textContent = (r.rtp * 100).toFixed(1) + "%";
       $("simTheory").textContent = (theory.rtp * 100).toFixed(1) + "%";
       $("simHit").textContent = (r.hit * 100).toFixed(1) + "%";
-      $("simSpend").textContent = compact(spend);
-      $("simPayout").textContent = compact(payout);
-      $("simProfit").textContent = (profit >= 0 ? "+" : "−") + compact(Math.abs(profit));
+      $("simSpend").textContent = tokenText(spend);
+      $("simPayout").textContent = tokenText(payout);
+      $("simProfit").textContent = (profit >= 0 ? "+" : "−") + tokenText(Math.abs(profit));
       $("simProfit").style.color = profit >= 0 ? "var(--ok)" : "var(--danger)";
-      $("simNet").textContent = (r.net >= 0 ? "+" : "−") + compact(Math.abs(r.net));
+      $("simNet").textContent = (r.net >= 0 ? "+" : "−") + tokenText(Math.abs(r.net));
       $("simNet").style.color = r.net > 0 ? "var(--danger)" : "var(--ok)";
       $("simOut").className = "sim-out on";
       var drift = Math.abs(r.rtp - theory.rtp) / (theory.rtp || 1);
       $("simNote").innerHTML = r.net > 0
-        ? '<span style="color:var(--danger)">每卖出一张这个票种，系统平均<b>倒贴 ' + compact(r.net) + ' 金币</b>。玩家刮得越多，金币越多。</span>'
-        : '<span style="color:var(--ok)">每张平均回收 ' + compact(-r.net) + " 金币，金币总量可控。</span>";
+        ? '<span style="color:var(--danger)">每卖出一张这个票种，系统平均<b>倒贴 ' + tokenText(r.net) + '</b>。玩家刮得越多，代币越多。</span>'
+        : '<span style="color:var(--ok)">每张平均回收 ' + tokenText(-r.net) + "，代币总量可控。</span>";
       if (drift > 0.15) $("simNote").innerHTML += '<br /><span style="color:var(--warn)">实测与理论偏差较大，通常是高倍数造成的长尾方差，可再跑几次。</span>';
     }, 30);
   };
@@ -1951,6 +2158,11 @@
     }
     var bad = cfg.tiers.filter(function (t) { return !t.prizePool.length || !t.multipliers.length || t.cost <= 0; });
     if (bad.length) { toast("有票种的奖金池 / 倍数池为空或票价无效", "err"); return; }
+    if (!cfg.economy || !Number.isSafeInteger(cfg.economy.coinsPerToken) || cfg.economy.coinsPerToken < 1 || cfg.economy.coinsPerToken > 1000000 ||
+        !isFinite(cfg.economy.myrPerToken) || cfg.economy.myrPerToken < 0.01 || cfg.economy.myrPerToken > 1000000 ||
+        Math.abs(cfg.economy.myrPerToken * 100 - Math.round(cfg.economy.myrPerToken * 100)) > 0.00000001) {
+      toast("代币换算设置无效", "err"); return;
+    }
     if (!Array.isArray(cfg.topups) || cfg.topups.length > TOPUP_MAX) { toast("充值套餐最多只能有 " + TOPUP_MAX + " 个", "err"); return; }
     var seenTopupIds = {};
     var invalidTopup = cfg.topups.some(function (item) {
@@ -2217,7 +2429,7 @@
     if (row && row.scrollIntoView) row.scrollIntoView({ behavior: "smooth", block: "nearest" });
     var priceInput = row && row.querySelector("input");
     if (priceInput) { priceInput.focus(); priceInput.select(); }
-    toast("已新增充值套餐 — 修改价格和金币后保存并应用");
+    toast("已新增充值套餐 — 修改价格和代币后保存并应用");
   };
 
   // ---------- set a target RTP by scaling the prize pool ----------
@@ -2267,6 +2479,7 @@
     renderFields();
     renderOdds();
     renderTopups();
+    renderPlayerReport();
     renderGauge();
     renderOverview();
     renderDirty();
@@ -2301,6 +2514,10 @@
         if (initialCheck) setAuthGate("error", "后台登录服务暂时不可用，请稍后重试。");
         return false;
       }
+      try {
+        var sessionPayload = await response.json();
+        if (sessionPayload && sessionPayload.username) $("managerIdentity").textContent = sessionPayload.username;
+      } catch (ignore) {}
       return true;
     } catch (e) {
       if (initialCheck) setAuthGate("error", "无法连接后台登录服务，请检查网络后重试。");
@@ -2328,6 +2545,10 @@
     void ensureManagerSession(false).then(function (authenticated) {
       if (authenticated && !isDirty()) loadRemote(true);
     });
+  });
+  window.addEventListener("storage", function (event) {
+    var username = String($("playerLookup").value || "").trim().toLowerCase();
+    if (event.key === PLAYER_ACCOUNTS_KEY || event.key === PLAYER_SAVE_PREFIX + username) renderPlayerReport();
   });
   void startManager();
 })();

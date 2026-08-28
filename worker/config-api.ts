@@ -41,6 +41,11 @@ type TopupPackage = {
   coins: number;
 };
 
+type EconomyConfig = {
+  coinsPerToken: number;
+  myrPerToken: number;
+};
+
 type OperatorConfig = {
   schemaVersion: 1;
   updatedAt: number;
@@ -48,7 +53,10 @@ type OperatorConfig = {
   odds: { m0: number; m1: number; m2: number; m3: number };
   tiers: TierConfig[];
   topups: TopupPackage[];
+  economy: EconomyConfig;
 };
+
+const DEFAULT_ECONOMY: EconomyConfig = { coinsPerToken: 50, myrPerToken: 1 };
 
 const DEFAULT_TOPUPS: TopupPackage[] = [
   { id: "starter", price: 4.9, coins: 5000 },
@@ -135,7 +143,25 @@ function validateTopups(value: unknown, fallback: TopupPackage[] = DEFAULT_TOPUP
   });
 }
 
-function validateConfig(value: unknown, updatedAt: number, fallbackTopups: TopupPackage[] = DEFAULT_TOPUPS): OperatorConfig {
+function validateEconomy(value: unknown, fallback: EconomyConfig = DEFAULT_ECONOMY): EconomyConfig {
+  if (value === undefined) return { ...fallback };
+  if (!isRecord(value)) throw new Error("economy must be an object");
+  const myrPerToken = readNumber(value.myrPerToken, "economy.myrPerToken", 0.01, 1_000_000);
+  if (Math.abs(myrPerToken * 100 - Math.round(myrPerToken * 100)) > 1e-8) {
+    throw new Error("economy.myrPerToken may use at most 2 decimal places");
+  }
+  return {
+    coinsPerToken: readInteger(value.coinsPerToken, "economy.coinsPerToken", 1, 1_000_000),
+    myrPerToken: Math.round(myrPerToken * 100) / 100,
+  };
+}
+
+function validateConfig(
+  value: unknown,
+  updatedAt: number,
+  fallbackTopups: TopupPackage[] = DEFAULT_TOPUPS,
+  fallbackEconomy: EconomyConfig = DEFAULT_ECONOMY,
+): OperatorConfig {
   if (!isRecord(value)) throw new Error("config must be an object");
   if (!isRecord(value.odds)) throw new Error("odds must be an object");
   if (!Array.isArray(value.tiers) || value.tiers.length < 1 || value.tiers.length > 12) {
@@ -187,6 +213,7 @@ function validateConfig(value: unknown, updatedAt: number, fallbackTopups: Topup
     odds,
     tiers,
     topups: validateTopups(value.topups, fallbackTopups),
+    economy: validateEconomy(value.economy, fallbackEconomy),
   };
 }
 
@@ -215,7 +242,12 @@ async function getConfig(db: D1Database, request: Request): Promise<Response> {
   } catch {
     return error("The stored game configuration is damaged", 500);
   }
-  if (isRecord(config) && config.topups === undefined) config = { ...config, topups: DEFAULT_TOPUPS };
+  if (isRecord(config)) {
+    const migrated = { ...config };
+    if (migrated.topups === undefined) migrated.topups = DEFAULT_TOPUPS;
+    if (migrated.economy === undefined) migrated.economy = DEFAULT_ECONOMY;
+    config = migrated;
+  }
   const etag = `\"lucky-config-v${row.version}\"`;
   if (request.headers.get("if-none-match") === etag) {
     return new Response(null, { status: 304, headers: { etag, "cache-control": "no-store" } });
@@ -248,21 +280,27 @@ async function putConfig(db: D1Database, request: Request, env: ConfigEnv): Prom
 
   const updatedAt = Date.now();
   let fallbackTopups = DEFAULT_TOPUPS;
-  if (isRecord(body.config) && body.config.topups === undefined && expectedVersion > 0) {
+  let fallbackEconomy = DEFAULT_ECONOMY;
+  if (
+    isRecord(body.config)
+    && (body.config.topups === undefined || body.config.economy === undefined)
+    && expectedVersion > 0
+  ) {
     const existing = await currentRow(db);
     if (existing?.version === expectedVersion) {
       try {
         const stored = JSON.parse(existing.configJson);
         if (isRecord(stored) && Array.isArray(stored.topups)) fallbackTopups = validateTopups(stored.topups);
+        if (isRecord(stored) && stored.economy !== undefined) fallbackEconomy = validateEconomy(stored.economy);
       } catch {
-        // Legacy or damaged top-up data falls back to the built-in catalog; the version check still guards the write.
+        // Legacy or damaged optional data falls back to built-in values; the version check still guards the write.
       }
     }
   }
 
   let config: OperatorConfig;
   try {
-    config = validateConfig(body.config, updatedAt, fallbackTopups);
+    config = validateConfig(body.config, updatedAt, fallbackTopups, fallbackEconomy);
   } catch (validationError) {
     return error(validationError instanceof Error ? validationError.message : "Configuration is invalid", 422);
   }

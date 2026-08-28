@@ -23,6 +23,11 @@ type TopupPackage = {
   coins: number;
 };
 
+type EconomyConfig = {
+  coinsPerToken: number;
+  myrPerToken: number;
+};
+
 type Cell = { number: number; prize: number; multiplier: number; instant?: boolean };
 type Ticket = {
   id: string;
@@ -94,7 +99,7 @@ const CONFIG_CHANNEL = "lucky-config";
 let acceptedCloudConfigVersion = -1;
 let cloudConfigRequestSequence = 0;
 type Odds = { m0: number; m1: number; m2: number; m3: number };
-type GameConfig = { types: TicketType[]; odds: Odds; multiplierMinLevel: number; topups: TopupPackage[] };
+type GameConfig = { types: TicketType[]; odds: Odds; multiplierMinLevel: number; topups: TopupPackage[]; economy: EconomyConfig };
 const DEFAULT_ODDS: Odds = { m0: 0.45, m1: 0.33, m2: 0.16, m3: 0.06 };
 const DEFAULT_TOPUPS: TopupPackage[] = [
   { id: "starter", price: 4.9, coins: 5000 },
@@ -102,12 +107,13 @@ const DEFAULT_TOPUPS: TopupPackage[] = [
   { id: "popular", price: 19.9, coins: 30000 },
   { id: "mega", price: 49.9, coins: 80000 },
 ];
-const DEFAULT_CONFIG: GameConfig = { types: TICKET_TYPES, odds: DEFAULT_ODDS, multiplierMinLevel: 3, topups: DEFAULT_TOPUPS };
+const DEFAULT_ECONOMY: EconomyConfig = { coinsPerToken: 50, myrPerToken: 1 };
+const DEFAULT_CONFIG: GameConfig = { types: TICKET_TYPES, odds: DEFAULT_ODDS, multiplierMinLevel: 3, topups: DEFAULT_TOPUPS, economy: DEFAULT_ECONOMY };
 
 /** Converts the operator document into the runtime shape. Any bad field falls back to the built-in default. */
 function normaliseConfig(value: unknown): GameConfig {
   try {
-    const parsed = (value || {}) as Partial<{ tiers: unknown[]; odds: Partial<Odds>; multiplierMinLevel: number; topups: unknown }>;
+    const parsed = (value || {}) as Partial<{ tiers: unknown[]; odds: Partial<Odds>; multiplierMinLevel: number; topups: unknown; economy: Partial<EconomyConfig> }>;
     const positives = (value: unknown, min: number) =>
       Array.isArray(value) ? value.map(Number).filter((entry) => Number.isFinite(entry) && entry >= min) : [];
 
@@ -162,7 +168,17 @@ function normaliseConfig(value: unknown): GameConfig {
           return packages;
         }, [])
       : DEFAULT_TOPUPS;
-    return { types, odds, multiplierMinLevel: Number.isFinite(minLevel) && minLevel >= 1 ? Math.floor(minLevel) : 3, topups };
+    const rawCoinsPerToken = Number(parsed.economy?.coinsPerToken);
+    const rawMyrPerToken = Number(parsed.economy?.myrPerToken);
+    const economy = {
+      coinsPerToken: Number.isSafeInteger(rawCoinsPerToken) && rawCoinsPerToken >= 1 && rawCoinsPerToken <= 1_000_000
+        ? rawCoinsPerToken
+        : DEFAULT_ECONOMY.coinsPerToken,
+      myrPerToken: Number.isFinite(rawMyrPerToken) && rawMyrPerToken >= 0.01 && rawMyrPerToken <= 1_000_000
+        ? Math.round(rawMyrPerToken * 100) / 100
+        : DEFAULT_ECONOMY.myrPerToken,
+    };
+    return { types, odds, multiplierMinLevel: Number.isFinite(minLevel) && minLevel >= 1 ? Math.floor(minLevel) : 3, topups, economy };
   } catch {
     return DEFAULT_CONFIG;
   }
@@ -229,6 +245,7 @@ const LOG_MAX = 80;
 const pushLog = (log: LogEntry[], entry: LogEntry): LogEntry[] => [entry, ...(Array.isArray(log) ? log : [])].slice(0, LOG_MAX);
 
 const formatCoins = (value: number) => new Intl.NumberFormat("en-US").format(value);
+const formatTokens = (coins: number, coinsPerToken: number) => new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(coins / coinsPerToken);
 const randomFrom = <T,>(items: T[]) => items[Math.floor(Math.random() * items.length)];
 
 function uniqueNumbers(count: number, min = 1, max = 60, blocked = new Set<number>()) {
@@ -334,12 +351,13 @@ function playTone(enabled: boolean, kind: "scratch" | "match" | "win" | "bigwin"
   } catch { /* Audio feedback is optional. */ }
 }
 
-function ScratchTile({ cell, revealed, matched, accent, sound, onReveal, onScratchStart }: {
+function ScratchTile({ cell, revealed, matched, accent, sound, coinsPerToken, onReveal, onScratchStart }: {
   cell: Cell;
   revealed: boolean;
   matched: boolean;
   accent: string;
   sound: boolean;
+  coinsPerToken: number;
   onReveal: () => void;
   onScratchStart: () => void;
 }) {
@@ -430,12 +448,12 @@ function ScratchTile({ cell, revealed, matched, accent, sound, onReveal, onScrat
       style={{ "--tile-accent": accent } as React.CSSProperties}
       role="button"
       tabIndex={0}
-      aria-label={revealed ? `${cell.number}, prize ${cell.prize * cell.multiplier} coins${matched ? ", match" : ""}` : "Covered scratch tile"}
+      aria-label={revealed ? `${cell.number}, prize ${formatTokens(cell.prize * cell.multiplier, coinsPerToken)} tokens${matched ? ", match" : ""}` : "Covered scratch tile"}
       onKeyDown={(event) => { if (!revealed && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); onScratchStart(); onReveal(); } }}
     >
       <div className="tile-content">
         <strong>{cell.number}</strong>
-        <small>{formatCoins(cell.prize)} COINS</small>
+        <small>{formatTokens(cell.prize, coinsPerToken)} TOKENS</small>
         {cell.multiplier > 1 && <b>{cell.multiplier}X</b>}
         {revealed && matched && <em>MATCH</em>}
       </div>
@@ -828,6 +846,7 @@ export default function Home() {
 
   const ticketType = ticket?.typeSnapshot || config.types.find((type) => type.id === ticket?.typeId) || config.types[0];
   const selectedType = config.types.find((type) => type.id === player.selectedTicketId) || config.types[0];
+  const tokenAmount = (coins: number) => formatTokens(coins, config.economy.coinsPerToken);
   const scratchedCount = ticket?.scratched.filter(Boolean).length || 0;
   const progressInLevel = player.ticketsPlayed % 5;
   const canRescue = player.coins < config.types[0].cost && sessionNow - player.rescueAt >= 6 * 60 * 60 * 1000;
@@ -840,8 +859,8 @@ export default function Home() {
         : "normal";
   const prizeCopy = {
     miss: { eyebrow: "再试一次", detail: "每一张都让你更进一步", icon: "◇", emblem: null },
-    normal: { eyebrow: "幸运中奖", detail: "金币奖励", icon: "◆", emblem: "/prize-assets/normal-win-emblem.webp" },
-    big: { eyebrow: "大奖时刻", detail: "高额金币奖励", icon: "✦", emblem: "/prize-assets/big-prize-emblem.webp" },
+    normal: { eyebrow: "幸运中奖", detail: "代币奖励", icon: "◆", emblem: "/prize-assets/normal-win-emblem.webp" },
+    big: { eyebrow: "大奖时刻", detail: "高额代币奖励", icon: "✦", emblem: "/prize-assets/big-prize-emblem.webp" },
     jackpot: { eyebrow: "超级大奖", detail: "最高荣耀奖励", icon: "♛", emblem: "/prize-assets/jackpot-emblem.webp" },
   }[prizeTier];
   const resultEffectPower = prizeEffectPower(ticket?.settled ? ticket.totalWin : 0, ticketType.cost);
@@ -910,7 +929,7 @@ export default function Home() {
     const type = selectedType;
     const cost = cheat.freeDraw ? 0 : type.cost;
     if (player.level < type.unlockLevel) { setToast(`等级 ${type.unlockLevel} 解锁`); return; }
-    if (player.coins < cost) { setToast("金币不足，可领取救济奖励"); return; }
+    if (player.coins < cost) { setToast("代币不足，可领取救济奖励"); return; }
     const nextPlayed = player.ticketsPlayed + 1;
     const nextLevel = Math.floor(nextPlayed / 5) + 1;
     const leveledUp = nextLevel > player.level;
@@ -932,7 +951,7 @@ export default function Home() {
   const claimRescue = () => {
     if (!canRescue) return;
     setPlayer((current) => ({ ...current, coins: current.coins + 1500, rescueAt: Date.now(), log: pushLog(current.log, { t: Date.now(), k: "rescue", a: 1500 }) }));
-    setToast("每日救济：+1,500 金币");
+    setToast(`每日救济：+${tokenAmount(1500)} 代币`);
   };
 
   const confirmDemoTopup = () => {
@@ -956,7 +975,7 @@ export default function Home() {
     setPlayer(nextPlayer);
     setSelectedTopup(null);
     setPanel(null);
-    setToast(`演示充值 +${formatCoins(currentPackage.coins)} 金币（不会扣款）`);
+    setToast(`演示充值 +${tokenAmount(currentPackage.coins)} 代币（不会扣款）`);
   };
 
   const resetSave = () => {
@@ -1020,10 +1039,10 @@ export default function Home() {
       <section ref={gameCardRef} className="game-card" aria-label="Lucky Scratch game">
         <header className="top-stats">
           {config.topups.length > 0
-            ? <button type="button" className="stat-button stat-balance" onClick={() => { setSelectedTopup(null); setPanel("topup"); }} aria-haspopup="dialog" aria-expanded={panel === "topup"} aria-label={`充值虚拟金币，当前余额 ${formatCoins(player.coins)}`}>
-                <span>余额 · 充值</span><strong><i className="coin-dot" />{formatCoins(player.coins)}</strong>
+            ? <button type="button" className="stat-button stat-balance" onClick={() => { setSelectedTopup(null); setPanel("topup"); }} aria-haspopup="dialog" aria-expanded={panel === "topup"} aria-label={`充值虚拟代币，当前余额 ${tokenAmount(player.coins)}`}>
+                <span>代币余额 · 充值</span><strong><i className="coin-dot" />{tokenAmount(player.coins)}</strong>
               </button>
-            : <div className="stat-display"><span>余额</span><strong><i className="coin-dot" />{formatCoins(player.coins)}</strong></div>}
+            : <div className="stat-display"><span>代币余额</span><strong><i className="coin-dot" />{tokenAmount(player.coins)}</strong></div>}
           <button type="button" className="brand-mark brand-button" onClick={bumpBrandTap}>LUCKY<span>SCRATCH</span></button>
           <div className="top-actions">
             <button className="stat-button stat-right" onClick={() => setPanel("collection")} aria-label="打开收藏">
@@ -1051,21 +1070,21 @@ export default function Home() {
           <div className="section-label muted" id="your-numbers-label"><span /> 你的号码 <span /></div>
           <div className="scratch-grid">
             {ticket.cells.map((cell, index) => (
-              <ScratchTile key={`${ticket.id}-${index}`} cell={cell} revealed={ticket.scratched[index]} matched={matchedIndices.has(index)} accent={ticketType.accent} sound={player.settings.sound} onScratchStart={scratchStart} onReveal={() => revealCell(index)} />
+              <ScratchTile key={`${ticket.id}-${index}`} cell={cell} revealed={ticket.scratched[index]} matched={matchedIndices.has(index)} accent={ticketType.accent} sound={player.settings.sound} coinsPerToken={config.economy.coinsPerToken} onScratchStart={scratchStart} onReveal={() => revealCell(index)} />
             ))}
           </div>
           {!player.tutorialSeen && !ticket.settled && <div className="tutorial-tip"><span>☝</span><b>拖动刮开</b><small>刮开银色区块即可开始</small></div>}
         </section>
 
-        <div className="ticket-meta"><span>{scratchedCount}/16 已刮开</span><strong>单价 {formatCoins(ticketType.cost)}</strong><span>最高 {formatCoins(player.bestWins[ticketType.id] || 0)}</span></div>
+        <div className="ticket-meta"><span>{scratchedCount}/16 已刮开</span><strong>单价 {tokenAmount(ticketType.cost)} 代币</strong><span>最高 {tokenAmount(player.bestWins[ticketType.id] || 0)}</span></div>
 
         <nav className="action-bar" aria-label="Game actions">
           <button disabled={ticket.settled || scratchedCount < 8} onClick={() => settle(true)}><span>✓</span>兑奖</button>
-          <button className="primary" disabled={player.coins < selectedType.cost || player.level < selectedType.unlockLevel} onClick={buyNewTicket}><span>＋</span>新的一张<small>{formatCoins(selectedType.cost)}</small></button>
+          <button className="primary" disabled={player.coins < selectedType.cost || player.level < selectedType.unlockLevel} onClick={buyNewTicket}><span>＋</span>新的一张<small>{tokenAmount(selectedType.cost)} 代币</small></button>
           <button disabled={ticket.settled} onClick={() => settle(true)}><span>✦</span>全部刮开</button>
         </nav>
 
-        {canRescue && <button className="rescue-banner" onClick={claimRescue}>金币不足？领取每日救济 <b>+1,500</b></button>}
+        {canRescue && <button className="rescue-banner" onClick={claimRescue}>代币不足？领取每日救济 <b>+{tokenAmount(1500)}</b></button>}
 
         <footer className="footer-nav">
           <button onClick={() => setPanel("shop")}><span>◈</span>票种</button>
@@ -1074,7 +1093,7 @@ export default function Home() {
           <button onClick={() => setPanel("settings")}><span>⚙</span>设置</button>
           <button className="dev-tab" onClick={openDevConsole}><span>🛠</span>开发者</button>
         </footer>
-        <p className="disclaimer">金币为虚拟货币，不可兑换现金或实物奖励。</p>
+        <p className="disclaimer">代币为虚拟游戏单位；RM 金额仅供参考，不可兑换现金或实物奖励。</p>
       </section>
 
       {toast && <div className="toast" role="status">{toast}</div>}
@@ -1119,13 +1138,13 @@ export default function Home() {
                     : <span aria-hidden="true">{prizeCopy.icon}</span>}
                 </span>
                 <p className="result-eyebrow">{prizeCopy.eyebrow}</p>
-                <h2 id="result-title">{ticket.totalWin > 0 ? `+${formatCoins(ticket.totalWin)}` : "未中奖"}</h2>
+                <h2 id="result-title">{ticket.totalWin > 0 ? `+${tokenAmount(ticket.totalWin)}` : "未中奖"}</h2>
               </div>
             </div>
             <div className="result-summary">
               <strong className="result-detail">{prizeCopy.detail}</strong>
               <div className="result-stats"><span><b>{matchedIndices.size}</b> 匹配</span><span><b>+1</b> 经验</span><span><b>{5 - progressInLevel}</b> 距升级</span></div>
-              <button className="result-next" onClick={buyNewTicket}>下一张 <small>{formatCoins(selectedType.cost)} 金币</small></button>
+              <button className="result-next" onClick={buyNewTicket}>下一张 <small>{tokenAmount(selectedType.cost)} 代币</small></button>
               <button className="text-button" onClick={() => setShowResult(false)}>查看彩票</button>
             </div>
           </section>
@@ -1136,19 +1155,19 @@ export default function Home() {
         <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) { setSelectedTopup(null); setPanel(null); } }}>
           <section ref={sheetRef} tabIndex={-1} className="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title">
             <div className="sheet-handle" />
-            <header><div><span>LUCKY SCRATCH</span><h2 id="sheet-title">{panel === "shop" ? "票种商店" : panel === "collection" ? "我的收藏" : panel === "topup" ? "充值虚拟金币" : "设置"}</h2></div><button onClick={() => { setSelectedTopup(null); setPanel(null); }} aria-label="关闭">×</button></header>
+            <header><div><span>LUCKY SCRATCH</span><h2 id="sheet-title">{panel === "shop" ? "票种商店" : panel === "collection" ? "我的收藏" : panel === "topup" ? "充值虚拟代币" : "设置"}</h2></div><button onClick={() => { setSelectedTopup(null); setPanel(null); }} aria-label="关闭">×</button></header>
 
             {panel === "topup" && <div className="topup-content">
-              <div className="topup-notice"><b>演示充值</b><span>不会真实扣款 · 金币只保存在本设备</span></div>
+              <div className="topup-notice"><b>演示充值</b><span>不会真实扣款 · 代币只保存在本设备</span></div>
               {config.topups.length === 0
                 ? <div className="topup-empty"><span>◇</span><b>暂未开放充值套餐</b><p>请稍后再回来看看。</p></div>
                 : <div className="topup-grid">{config.topups.map((item) => (
                     <button type="button" className={selectedTopup?.id === item.id ? "selected" : ""} key={item.id} onClick={() => setSelectedTopup({ ...item })}>
-                      <span>虚拟金币</span><strong>+{formatCoins(item.coins)}</strong><small>参考价 RM {item.price.toFixed(2)}</small>
+                      <span>虚拟代币</span><strong>+{tokenAmount(item.coins)}</strong><small>参考价 RM {item.price.toFixed(2)}</small>
                     </button>
                   ))}</div>}
               {selectedTopup && <div ref={topupConfirmRef} tabIndex={-1} aria-live="polite" className="topup-confirm">
-                <p>确认领取 <b>+{formatCoins(selectedTopup.coins)}</b> 虚拟金币？</p>
+                <p>确认领取 <b>+{tokenAmount(selectedTopup.coins)}</b> 虚拟代币？</p>
                 <small>显示参考价 RM {selectedTopup.price.toFixed(2)}，本演示不会产生任何付款。</small>
                 <div><button type="button" onClick={() => setSelectedTopup(null)}>取消</button><button type="button" className="confirm" onClick={confirmDemoTopup}>确认演示充值</button></div>
               </div>}
@@ -1160,14 +1179,14 @@ export default function Home() {
               const selected = player.selectedTicketId === type.id;
               return <article className={`ticket-option ${selected ? "selected" : ""} ${locked ? "locked" : ""}`} key={type.id} style={{ "--option-accent": type.accent, "--option-accent-2": type.accent2 } as React.CSSProperties}>
                 <div className="mini-ticket"><span>刮开</span><strong>{type.shortName}</strong><small>{type.maxLabel}</small></div>
-                <div className="ticket-copy"><h3>{type.name}</h3><p>{type.feature}</p><div><b>{formatCoins(type.cost)} 金币</b><span>{locked ? `等级 ${type.unlockLevel}` : "已解锁"}</span></div></div>
+                <div className="ticket-copy"><h3>{type.name}</h3><p>{type.feature}</p><div><b>{tokenAmount(type.cost)} 代币</b><span>{locked ? `等级 ${type.unlockLevel}` : "已解锁"}</span></div></div>
                 <button disabled={locked} onClick={() => { setPlayer((current) => ({ ...current, selectedTicketId: type.id })); setToast(`已选择 ${type.name}`); setPanel(null); }}>{locked ? "未解锁" : selected ? "已选择" : "选择"}</button>
               </article>;
             })}</div>}
 
             {panel === "collection" && <div className="collection-content">
               <div className="collection-hero"><span>等级 {player.level}</span><strong>{player.ticketsPlayed}</strong><p>已刮张数</p><div><i style={{ width: `${(progressInLevel / 5) * 100}%` }} /></div><small>再刮 {5 - progressInLevel} 张升到 {player.level + 1} 级</small></div>
-              <div className="badge-grid">{config.types.map((type) => { const unlocked = player.level >= type.unlockLevel; return <article key={type.id} className={unlocked ? "" : "badge-locked"}><span style={{ background: `linear-gradient(145deg,${type.accent},${type.accent2})` }}>{unlocked ? "♛" : "⌁"}</span><h3>{type.shortName}</h3><p>{unlocked ? `最高 ${formatCoins(player.bestWins[type.id] || 0)}` : `${type.unlockLevel} 级解锁`}</p></article>; })}</div>
+              <div className="badge-grid">{config.types.map((type) => { const unlocked = player.level >= type.unlockLevel; return <article key={type.id} className={unlocked ? "" : "badge-locked"}><span style={{ background: `linear-gradient(145deg,${type.accent},${type.accent2})` }}>{unlocked ? "♛" : "⌁"}</span><h3>{type.shortName}</h3><p>{unlocked ? `最高 ${tokenAmount(player.bestWins[type.id] || 0)} 代币` : `${type.unlockLevel} 级解锁`}</p></article>; })}</div>
               <p className="collection-note">同一票种刮满 50 张即可获得金色收藏徽章。</p>
             </div>}
 
@@ -1176,7 +1195,7 @@ export default function Home() {
               <label htmlFor="vibration-toggle"><span><b>振动</b><small>支持的手机上轻微震动</small></span><input id="vibration-toggle" aria-label="振动" type="checkbox" checked={player.settings.vibration} onChange={(event) => setPlayer((current) => ({ ...current, settings: { ...current.settings, vibration: event.target.checked } }))} /></label>
               <a className="settings-row" href="/profile.html" style={{ textDecoration: "none" }}><span>账户与个人资料</span><b>打开</b></a>
               <button className="reset-button" onClick={resetSave}>重置全部进度</button>
-              <p>幸运刮刮乐是仅使用虚拟金币的娱乐游戏，不涉及真实货币、提现或实物奖励。</p>
+              <p>幸运刮刮乐仅使用虚拟代币；RM 金额为运营参考，不涉及真实付款、提现或实物奖励。</p>
             </div>}
           </section>
         </div>
@@ -1193,9 +1212,9 @@ export default function Home() {
               <li><h4>中奖</h4><p>刮出的号码只要出现在<b>中奖号码</b>中即可获奖——带 <b>✦ 倍数</b>的格子还会成倍放大奖金。</p></li>
               <li><h4>完成刮卡</h4><p>至少刮开 <b>8 格</b>后点<b>兑奖</b>，或点<b>全部刮开</b>展开整张卡；买<b>新的一张</b>再玩一次。</p></li>
               <li><h4>升级</h4><p>每刮 <b>5 张</b>升一级，解锁更贵、奖金更高的票种。同一票种刮满 50 张可获得<b>金色收藏徽章</b>。</p></li>
-              <li><h4>金币不足？</h4><p>余额低于最低票价时，可以领取<b>救济金币</b>继续游戏。</p></li>
+              <li><h4>代币不足？</h4><p>余额低于最低票价时，可以领取<b>救济代币</b>继续游戏。</p></li>
             </ul>
-            <p className="help-note">金币为虚拟货币，不可兑换现金或实物奖励。</p>
+            <p className="help-note">代币为虚拟游戏单位，不可兑换现金或实物奖励。</p>
           </section>
         </div>
       )}
