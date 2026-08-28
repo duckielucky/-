@@ -118,8 +118,54 @@
     align-items:start;padding:20px clamp(16px,3vw,32px) 60px;
     max-width:1560px;margin:0 auto;
   }
-  @media (max-width:1180px){.wrap{grid-template-columns:190px minmax(0,1fr)}.rail{grid-column:1/-1}}
+  @media (max-width:1180px){.wrap{grid-template-columns:190px minmax(0,1fr)}.rail{grid-column:2}.manager-single-view .editor{grid-column:2}}
   @media (max-width:760px){.wrap{grid-template-columns:1fr}.tiers{display:flex;overflow-x:auto;gap:10px}.tier-btn{min-width:150px}}
+  [hidden]{display:none!important}
+
+  /* ---------- primary manager navigation ---------- */
+  .manager-nav{display:grid;gap:7px;position:sticky;top:82px;min-width:0}
+  .manager-nav-label{
+    margin:0 0 3px 3px;color:var(--dim);font-size:11px;font-weight:700;
+    letter-spacing:.08em;text-transform:uppercase;
+  }
+  .manager-nav-btn{
+    width:100%;min-width:0;display:grid;grid-template-columns:30px minmax(0,1fr);gap:10px;
+    align-items:center;padding:11px 12px;border:1px solid var(--line);border-radius:11px;
+    background:var(--panel);color:var(--muted);text-align:left;
+    transition:background .16s ease,border-color .16s ease,color .16s ease,transform .1s ease;
+  }
+  .manager-nav-btn:hover{background:var(--panel-2);border-color:var(--line-strong);color:var(--ink)}
+  .manager-nav-btn:active{transform:translateY(1px)}
+  .manager-nav-btn.on{
+    color:var(--ink);background:color-mix(in srgb,var(--signal) 9%,var(--panel));
+    border-color:color-mix(in srgb,var(--signal) 48%,var(--line));
+  }
+  .manager-nav-btn:focus-visible{outline:2px solid var(--signal);outline-offset:2px}
+  .manager-nav-index{
+    width:30px;height:30px;display:grid;place-items:center;border-radius:8px;
+    background:var(--panel-2);color:var(--dim);font-family:var(--mono);font-size:10px;font-weight:700;
+  }
+  .manager-nav-btn.on .manager-nav-index{background:var(--signal);color:#fff}
+  .manager-nav-copy{min-width:0;display:grid;gap:1px}
+  .manager-nav-copy b{font-size:13px;font-weight:650;color:inherit;white-space:nowrap}
+  .manager-nav-copy small{font-size:10px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .manager-view-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:1px}
+  .manager-view-head h2{margin:0;font-size:22px;line-height:1.25;letter-spacing:-.025em}
+  .manager-view-head p{margin:4px 0 0;color:var(--muted);font-size:12px}
+  .manager-view-badge{
+    flex:none;padding:4px 9px;border:1px solid var(--line);border-radius:999px;
+    color:var(--dim);background:var(--panel);font-size:10px;font-weight:650;
+  }
+  .manager-single-view .editor{grid-column:2/4;width:min(100%,960px)}
+  .editor>.tiers{
+    position:static;display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:10px;
+  }
+  .editor>.tiers .rail-label{grid-column:1/-1}
+  .account-summary{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:18px;align-items:center}
+  .account-copy{display:grid;gap:3px}
+  .account-copy strong{font-size:15px}
+  .account-copy span{color:var(--muted);font-size:12px}
+  .account-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
 
   .card{
     border:1px solid var(--line);border-radius:var(--radius);
@@ -763,9 +809,37 @@
   :root[data-theme="dark"] .help-body .warn b{color:#ffcf80}
   :root[data-theme="dark"] .help-back{background:rgba(0,0,0,.55)}
   :root[data-theme="dark"] .mobar{background:rgba(28,28,30,.82)}
+
+  /* The manager categories become a compact top bar on phones. */
+  @media (max-width:900px){
+    .manager-nav{
+      position:static;display:flex;gap:7px;overflow-x:auto;
+      margin:0 -14px;padding:0 14px 3px;scrollbar-width:none;
+      scroll-snap-type:x proximity;
+    }
+    .manager-nav::-webkit-scrollbar{display:none}
+    .manager-nav-label{display:none}
+    .manager-nav-btn{
+      flex:0 0 auto;min-width:128px;min-height:48px;padding:8px 11px;
+      grid-template-columns:26px minmax(0,1fr);scroll-snap-align:start;
+    }
+    .manager-nav-index{width:26px;height:26px}
+    .manager-nav-copy small{display:none}
+    .manager-single-view .editor{grid-column:1;width:100%}
+    .editor>.tiers{display:flex}
+    .rail{grid-column:1}
+    .manager-view-head{align-items:flex-start}
+    .manager-view-head h2{font-size:20px}
+    .account-summary{grid-template-columns:1fr}
+    .account-actions{justify-content:flex-start}
+    body[data-manager-view="players"] .mobar,
+    body[data-manager-view="account"] .mobar{display:none}
+    body[data-manager-view="topups"] .mobar-rtp{display:none}
+    body[data-manager-view="topups"] .mobar .btn{width:100%;justify-content:center}
+  }
 </style>
 </head>
-<body class="auth-checking">
+<body class="auth-checking" data-manager-view="tickets">
 
 <div class="auth-gate" id="authGate" data-state="loading" role="status" aria-live="polite">
   <div class="auth-gate-card">
@@ -795,8 +869,6 @@
   <div class="actions">
     <button class="btn" id="btnExport">导出配置</button>
     <button class="btn" id="btnImport">导入配置</button>
-    <button class="btn" id="btnChangePw" type="button">修改密码</button>
-    <button class="btn" id="btnLogout" type="button">退出后台</button>
     <button class="btn btn-danger" id="btnReset">恢复默认</button>
     <button class="btn btn-primary" id="btnSave" disabled>保存并应用</button>
   </div>
@@ -805,15 +877,42 @@
 
 <main class="wrap">
 
-  <nav class="tiers" id="tiers" aria-label="票种">
-    <p class="rail-label">票种</p>
-    <button class="tier-add" id="btnAddTier" type="button">＋ 新增票种</button>
+  <nav class="manager-nav" id="managerNav" aria-label="后台功能">
+    <p class="manager-nav-label">后台功能</p>
+    <button class="manager-nav-btn on" type="button" data-manager-target="tickets" aria-current="page">
+      <span class="manager-nav-index">01</span>
+      <span class="manager-nav-copy"><b>票种系统</b><small>制作与调整票种</small></span>
+    </button>
+    <button class="manager-nav-btn" type="button" data-manager-target="topups">
+      <span class="manager-nav-index">02</span>
+      <span class="manager-nav-copy"><b>配套系统</b><small>充值与代币设置</small></span>
+    </button>
+    <button class="manager-nav-btn" type="button" data-manager-target="players">
+      <span class="manager-nav-index">03</span>
+      <span class="manager-nav-copy"><b>玩家记录</b><small>查询本机玩家日志</small></span>
+    </button>
+    <button class="manager-nav-btn" type="button" data-manager-target="account">
+      <span class="manager-nav-index">04</span>
+      <span class="manager-nav-copy"><b>账户设置</b><small>修改密码与退出</small></span>
+    </button>
   </nav>
 
   <div class="editor">
+    <div class="manager-view-head">
+      <div>
+        <h2 id="managerViewTitle" tabindex="-1">票种系统</h2>
+        <p id="managerViewSubtitle">制作票种、奖金、倍数与中奖概率</p>
+      </div>
+      <span class="manager-view-badge" id="managerViewBadge">票种制作</span>
+    </div>
+
+    <nav class="tiers" id="tiers" aria-label="选择票种" data-manager-section="tickets">
+      <p class="rail-label">选择票种</p>
+      <button class="tier-add" id="btnAddTier" type="button">＋ 新增票种</button>
+    </nav>
 
     <!-- 奖金池 -->
-    <section class="card sec">
+    <section class="card sec" data-manager-section="tickets">
       <div class="sec-head">
         <h2>奖金池</h2>
         <span class="tag" id="tagPrize">6 个奖金</span>
@@ -830,7 +929,7 @@
     </section>
 
     <!-- 倍数池 -->
-    <section class="card sec">
+    <section class="card sec" data-manager-section="tickets">
       <div class="sec-head">
         <h2>倍数池</h2>
         <span class="tag" id="tagMult">3 个倍数</span>
@@ -858,7 +957,7 @@
     </section>
 
     <!-- 基础参数 -->
-    <section class="card sec">
+    <section class="card sec" data-manager-section="tickets">
       <div class="sec-head"><h2>票种参数</h2><button class="btn btn-danger" id="btnDelTier" type="button" style="margin-left:auto;padding:5px 11px;font-size:12px">删除此票种</button><button class="info" type="button" data-help="tier" aria-label="票种参数怎么用" style="margin-left:8px">i</button></div>
       <div class="grid">
         <div class="field">
@@ -899,7 +998,7 @@
     </section>
 
     <!-- 代币换算（全局） -->
-    <section class="card sec">
+    <section class="card sec" data-manager-section="topups" hidden>
       <div class="sec-head">
         <h2>代币经济</h2>
         <span class="tag">全局</span>
@@ -922,7 +1021,7 @@
     </section>
 
     <!-- 中奖概率 -->
-    <section class="card sec">
+    <section class="card sec" data-manager-section="tickets">
       <div class="sec-head">
         <h2>中奖格数概率</h2>
         <span class="tag">全局</span>
@@ -941,7 +1040,7 @@
     </section>
 
     <!-- 虚拟代币充值套餐（全局） -->
-    <section class="card sec">
+    <section class="card sec" data-manager-section="topups" hidden>
       <div class="sec-head">
         <h2>充值套餐</h2>
         <span class="tag" id="tagTopup">4 个套餐</span>
@@ -955,7 +1054,7 @@
     </section>
 
     <!-- 同一浏览器上的玩家记录 -->
-    <section class="card sec">
+    <section class="card sec" data-manager-section="players" hidden>
       <div class="sec-head">
         <h2>玩家记录</h2>
         <span class="tag">仅此浏览器</span>
@@ -980,13 +1079,31 @@
       <div class="player-log" id="playerLog"><div class="player-log-empty">尚未读取玩家记录</div></div>
     </section>
 
+    <section class="card sec" data-manager-section="account" hidden>
+      <div class="sec-head">
+        <h2>账户设置</h2>
+        <span class="tag">安全会话</span>
+      </div>
+      <div class="account-summary">
+        <div class="account-copy">
+          <span>当前管理员</span>
+          <strong id="managerIdentityAccount">Admin</strong>
+          <span>修改密码会影响下次登录；退出会结束本次浏览器会话。</span>
+        </div>
+        <div class="account-actions">
+          <button class="btn" id="btnChangePw" type="button">修改管理密码</button>
+          <button class="btn btn-danger" id="btnLogout" type="button">退出后台</button>
+        </div>
+      </div>
+    </section>
+
     <p class="foot">
       点击<b>保存并应用</b>会把配置同步到 Cloudflare，所有设备上的游戏会自动获取新版本。
       浏览器仍会在 <code>lucky_config_v1</code> 保留离线副本；后台登录在本次浏览器会话中保持有效。
     </p>
   </div>
 
-  <aside class="rail">
+  <aside class="rail" data-manager-section="tickets">
     <section class="card gauge">
       <p class="gauge-label">实时赔付率 RTP <button class="info" type="button" data-help="rtp" aria-label="赔付率怎么用">i</button></p>
       <p class="gauge-value" id="rtpValue">—</p>
@@ -1175,6 +1292,72 @@
     if (Math.abs(n) >= 10000) return (n / 10000).toFixed(n >= 1000000 ? 0 : 2) + " 万";
     return num(Math.round(n));
   }
+
+  // ---------- manager categories ----------
+  var MANAGER_VIEWS = {
+    tickets: {
+      title: "票种系统",
+      subtitle: "制作票种、奖金、倍数与中奖概率",
+      badge: "票种制作"
+    },
+    topups: {
+      title: "配套系统",
+      subtitle: "管理代币换算与充值套餐",
+      badge: "充值管理"
+    },
+    players: {
+      title: "玩家记录",
+      subtitle: "查询本浏览器保存的玩家进度与记录",
+      badge: "本机数据"
+    },
+    account: {
+      title: "账户设置",
+      subtitle: "修改管理密码或退出当前后台会话",
+      badge: "Admin"
+    }
+  };
+
+  function setManagerView(key, options) {
+    var view = MANAGER_VIEWS[key] ? key : "tickets";
+    var meta = MANAGER_VIEWS[view];
+    var opts = options || {};
+    document.querySelectorAll("[data-manager-section]").forEach(function (section) {
+      section.hidden = section.getAttribute("data-manager-section") !== view;
+    });
+    document.querySelectorAll("[data-manager-target]").forEach(function (button) {
+      var selected = button.getAttribute("data-manager-target") === view;
+      button.classList.toggle("on", selected);
+      if (selected) button.setAttribute("aria-current", "page");
+      else button.removeAttribute("aria-current");
+    });
+    document.body.setAttribute("data-manager-view", view);
+    document.body.classList.toggle("manager-single-view", view !== "tickets");
+    $("managerViewTitle").textContent = meta.title;
+    $("managerViewSubtitle").textContent = meta.subtitle;
+    $("managerViewBadge").textContent = meta.badge;
+    if (opts.updateHash !== false && window.history && history.replaceState) {
+      history.replaceState(null, "", location.pathname + location.search + "#" + view);
+    }
+    var selectedButton = document.querySelector('[data-manager-target="' + view + '"]');
+    if (selectedButton && window.matchMedia && window.matchMedia("(max-width: 900px)").matches) {
+      selectedButton.scrollIntoView({ behavior: opts.instant ? "auto" : "smooth", block: "nearest", inline: "center" });
+    }
+    if (opts.focus) $("managerViewTitle").focus();
+  }
+
+  document.querySelectorAll("[data-manager-target]").forEach(function (button) {
+    button.addEventListener("click", function () {
+      setManagerView(button.getAttribute("data-manager-target"), { focus: true });
+    });
+  });
+  window.addEventListener("hashchange", function () {
+    var key = location.hash.slice(1);
+    if (MANAGER_VIEWS[key]) setManagerView(key, { updateHash: false, instant: true });
+  });
+  var initialManagerView = location.hash.slice(1);
+  if (!MANAGER_VIEWS[initialManagerView]) initialManagerView = "tickets";
+  setManagerView(initialManagerView, { focus: false, instant: true });
+
   function tokensFromCoins(coins) {
     var unit = cfg && cfg.economy && Number(cfg.economy.coinsPerToken);
     return Number(coins) / (Number.isSafeInteger(unit) && unit > 0 ? unit : 50);
@@ -1194,7 +1377,7 @@
       title: "运营后台使用说明", sub: "这个后台是用来干嘛的",
       body: [
         { h: "它管什么", p: "这里配置每种<b>刮刮乐票种</b>的经济参数——奖金池、倍数池、票价、中奖概率，也可以管理游戏里展示的<b>虚拟金币充值套餐</b>。票种参数会影响玩家的<b>赔付率（RTP）</b>。" },
-        { h: "怎么改", p: "左边先选<b>票种</b>，中间各区块改参数。每个区块右上角的 <b>ⓘ</b> 点开都有详细说明。改动后顶部会亮起「有未保存的更改」，点 <b>保存并应用</b> 才生效。" },
+        { h: "怎么改", p: "先打开<b>票种系统</b>，再选择要调整的票种。配套、玩家记录和账户操作分别放在其他三个分类中；手机上四个分类会显示在页面顶部。改动后点 <b>保存并应用</b> 才生效。" },
         { h: "先盯这个数", p: "右侧<b>实时赔付率 RTP</b> 是最关键的指标：低于 100% 在回收金币，高于 100% 每卖一张都在净发金币。健康区间大约 <b>45%–90%</b>。" },
         { h: "备份与还原", p: "<b>导出配置</b> 存成 JSON 备份；<b>导入配置</b> 载入旧备份；<b>恢复默认</b> 回到出厂参数（会清掉当前改动，慎用）。" },
         { h: "上线前先验证", p: "用<b>模拟验证</b>跑几万张票，看实测赔付率和理论值是否接近，确认没配错再保存。" },
@@ -2516,7 +2699,10 @@
       }
       try {
         var sessionPayload = await response.json();
-        if (sessionPayload && sessionPayload.username) $("managerIdentity").textContent = sessionPayload.username;
+        if (sessionPayload && sessionPayload.username) {
+          $("managerIdentity").textContent = sessionPayload.username;
+          $("managerIdentityAccount").textContent = sessionPayload.username;
+        }
       } catch (ignore) {}
       return true;
     } catch (e) {

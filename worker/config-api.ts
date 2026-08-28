@@ -248,7 +248,7 @@ async function getConfig(db: D1Database, request: Request): Promise<Response> {
     if (migrated.economy === undefined) migrated.economy = DEFAULT_ECONOMY;
     config = migrated;
   }
-  const etag = `\"lucky-config-v${row.version}\"`;
+  const etag = `"lucky-config-v${row.version}"`;
   if (request.headers.get("if-none-match") === etag) {
     return new Response(null, { status: 304, headers: { etag, "cache-control": "no-store" } });
   }
@@ -326,7 +326,7 @@ async function putConfig(db: D1Database, request: Request, env: ConfigEnv): Prom
   }
 
   const version = expectedVersion + 1;
-  return json({ config, version, updatedAt }, 200, { etag: `\"lucky-config-v${version}\"` });
+  return json({ config, version, updatedAt }, 200, { etag: `"lucky-config-v${version}"` });
 }
 
 export async function handleConfigApi(request: Request, env: ConfigEnv): Promise<Response | null> {
