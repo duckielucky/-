@@ -102,10 +102,10 @@ type Odds = { m0: number; m1: number; m2: number; m3: number };
 type GameConfig = { types: TicketType[]; odds: Odds; multiplierMinLevel: number; topups: TopupPackage[]; economy: EconomyConfig };
 const DEFAULT_ODDS: Odds = { m0: 0.45, m1: 0.33, m2: 0.16, m3: 0.06 };
 const DEFAULT_TOPUPS: TopupPackage[] = [
-  { id: "starter", price: 4.9, coins: 5000 },
-  { id: "value", price: 9.9, coins: 12000 },
-  { id: "popular", price: 19.9, coins: 30000 },
-  { id: "mega", price: 49.9, coins: 80000 },
+  { id: "starter", price: 5, coins: 250 },
+  { id: "value", price: 10, coins: 500 },
+  { id: "popular", price: 20, coins: 1000 },
+  { id: "mega", price: 50, coins: 2500 },
 ];
 const DEFAULT_ECONOMY: EconomyConfig = { coinsPerToken: 50, myrPerToken: 1 };
 const DEFAULT_CONFIG: GameConfig = { types: TICKET_TYPES, odds: DEFAULT_ODDS, multiplierMinLevel: 3, topups: DEFAULT_TOPUPS, economy: DEFAULT_ECONOMY };
@@ -674,8 +674,11 @@ export default function Home() {
     if (!selectedTopup) return;
     const current = config.topups.find((item) => item.id === selectedTopup.id);
     if (!current || current.price !== selectedTopup.price || current.coins !== selectedTopup.coins) {
-      setSelectedTopup(null);
-      setToast("充值套餐已更新，请重新选择");
+      const refreshTask = window.setTimeout(() => {
+        setSelectedTopup(null);
+        setToast("充值套餐已更新，请重新选择");
+      }, 0);
+      return () => window.clearTimeout(refreshTask);
     }
   }, [config.topups, selectedTopup]);
 

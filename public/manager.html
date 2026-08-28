@@ -1126,10 +1126,10 @@
       economy: { coinsPerToken: 50, myrPerToken: 1 },
       odds: { m0: 0.45, m1: 0.33, m2: 0.16, m3: 0.06 },
       topups: [
-        { id: "starter", price: 4.9, coins: 5000 },
-        { id: "value", price: 9.9, coins: 12000 },
-        { id: "popular", price: 19.9, coins: 30000 },
-        { id: "mega", price: 49.9, coins: 80000 }
+        { id: "starter", price: 5, coins: 250 },
+        { id: "value", price: 10, coins: 500 },
+        { id: "popular", price: 20, coins: 1000 },
+        { id: "mega", price: 50, coins: 2500 }
       ],
       tiers: [
         { id: "starter_100x", name: "100X Starter", shortName: "100X", maxLabel: "100X", feature: "经典对号中奖",
@@ -1188,7 +1188,6 @@
     var value = tokensFromCoins(coins) * (isFinite(rate) && rate > 0 ? rate : 1);
     return isFinite(value) ? "RM " + value.toFixed(2) : "—";
   }
-
   // ---------- explainers, opened from the i icons ----------
   var HELP = {
     guide: {
@@ -1397,7 +1396,6 @@
         out.topups.push({ id: id, price: Math.round(price * 100) / 100, coins: coins });
       });
     }
-
     if (Array.isArray(raw.tiers) && raw.tiers.length) {
       out.tiers = raw.tiers.map(function (t, i) {
         var base = d.tiers[i] || d.tiers[0];
@@ -2422,7 +2420,9 @@
 
   $("btnAddTopup").onclick = function () {
     if (cfg.topups.length >= TOPUP_MAX) { toast("最多 " + TOPUP_MAX + " 个充值套餐", "err"); return; }
-    cfg.topups.push({ id: newTopupId(), price: 5, coins: 5000 });
+    var defaultTopupTokens = 10;
+    var defaultTopupPrice = Math.min(1000000, Math.max(0.01, Math.round(defaultTopupTokens * cfg.economy.myrPerToken * 100) / 100));
+    cfg.topups.push({ id: newTopupId(), price: defaultTopupPrice, coins: Math.max(1, Math.round(defaultTopupTokens * cfg.economy.coinsPerToken)) });
     touch(); renderAll();
     var rows = $("topupRows").querySelectorAll(".topup-row");
     var row = rows[rows.length - 1];
