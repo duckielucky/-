@@ -146,12 +146,10 @@
     background:var(--panel-2);color:var(--dim);font-family:var(--mono);font-size:10px;font-weight:700;
   }
   .manager-nav-btn.on .manager-nav-index{background:var(--signal);color:#fff}
-  .manager-nav-copy{min-width:0;display:grid;gap:1px}
+  .manager-nav-copy{min-width:0;display:grid}
   .manager-nav-copy b{font-size:13px;font-weight:650;color:inherit;white-space:nowrap}
-  .manager-nav-copy small{font-size:10px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .manager-view-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:1px}
+  .manager-view-head{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:1px}
   .manager-view-head h2{margin:0;font-size:22px;line-height:1.25;letter-spacing:-.025em}
-  .manager-view-head p{margin:4px 0 0;color:var(--muted);font-size:12px}
   .manager-view-badge{
     flex:none;padding:4px 9px;border:1px solid var(--line);border-radius:999px;
     color:var(--dim);background:var(--panel);font-size:10px;font-weight:650;
@@ -824,7 +822,6 @@
       grid-template-columns:26px minmax(0,1fr);scroll-snap-align:start;
     }
     .manager-nav-index{width:26px;height:26px}
-    .manager-nav-copy small{display:none}
     .manager-single-view .editor{grid-column:1;width:100%}
     .editor>.tiers{display:flex}
     .rail{grid-column:1}
@@ -881,28 +878,25 @@
     <p class="manager-nav-label">后台功能</p>
     <button class="manager-nav-btn on" type="button" data-manager-target="tickets" aria-current="page">
       <span class="manager-nav-index">01</span>
-      <span class="manager-nav-copy"><b>票种系统</b><small>制作与调整票种</small></span>
+      <span class="manager-nav-copy"><b>票种系统</b></span>
     </button>
     <button class="manager-nav-btn" type="button" data-manager-target="topups">
       <span class="manager-nav-index">02</span>
-      <span class="manager-nav-copy"><b>配套系统</b><small>充值与代币设置</small></span>
+      <span class="manager-nav-copy"><b>配套系统</b></span>
     </button>
     <button class="manager-nav-btn" type="button" data-manager-target="players">
       <span class="manager-nav-index">03</span>
-      <span class="manager-nav-copy"><b>玩家记录</b><small>查询本机玩家日志</small></span>
+      <span class="manager-nav-copy"><b>玩家记录</b></span>
     </button>
     <button class="manager-nav-btn" type="button" data-manager-target="account">
       <span class="manager-nav-index">04</span>
-      <span class="manager-nav-copy"><b>账户设置</b><small>修改密码与退出</small></span>
+      <span class="manager-nav-copy"><b>账户设置</b></span>
     </button>
   </nav>
 
   <div class="editor">
     <div class="manager-view-head">
-      <div>
-        <h2 id="managerViewTitle" tabindex="-1">票种系统</h2>
-        <p id="managerViewSubtitle">制作票种、奖金、倍数与中奖概率</p>
-      </div>
+      <h2 id="managerViewTitle" tabindex="-1">票种系统</h2>
       <span class="manager-view-badge" id="managerViewBadge">票种制作</span>
     </div>
 
@@ -1297,22 +1291,18 @@
   var MANAGER_VIEWS = {
     tickets: {
       title: "票种系统",
-      subtitle: "制作票种、奖金、倍数与中奖概率",
       badge: "票种制作"
     },
     topups: {
       title: "配套系统",
-      subtitle: "管理代币换算与充值套餐",
       badge: "充值管理"
     },
     players: {
       title: "玩家记录",
-      subtitle: "查询本浏览器保存的玩家进度与记录",
       badge: "本机数据"
     },
     account: {
       title: "账户设置",
-      subtitle: "修改管理密码或退出当前后台会话",
       badge: "Admin"
     }
   };
@@ -1333,7 +1323,6 @@
     document.body.setAttribute("data-manager-view", view);
     document.body.classList.toggle("manager-single-view", view !== "tickets");
     $("managerViewTitle").textContent = meta.title;
-    $("managerViewSubtitle").textContent = meta.subtitle;
     $("managerViewBadge").textContent = meta.badge;
     if (opts.updateHash !== false && window.history && history.replaceState) {
       history.replaceState(null, "", location.pathname + location.search + "#" + view);
