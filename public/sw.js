@@ -1,4 +1,4 @@
-const CACHE = "lucky-scratch-v13";
+const CACHE = "lucky-scratch-v14";
 const CORE = ["/", "/login.html", "/profile.html", "/lucky-account.css", "/lucky-account.js", "/lottery-background.webp", "/game-lottery-background.webp", "/profile-lottery-background.webp", "/manifest.webmanifest", "/favicon.svg"];
 
 function canonicalPathname(pathname) {
