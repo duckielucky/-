@@ -7,6 +7,12 @@ const MANAGER_USERNAME = "Admin";
 const MANAGER_PASSWORD = "Test1234";
 const MANAGER_SESSION_SECRET = "unit-test-manager-session-secret-2026-08-25";
 const MANAGER_COOKIE_NAME = "__Host-lucky-manager-session";
+const NATURAL_DEFAULT_TOPUPS = [
+  { id: "starter", price: 5, coins: 250 },
+  { id: "value", price: 10, coins: 500 },
+  { id: "popular", price: 20, coins: 1000 },
+  { id: "mega", price: 50, coins: 2500 },
+];
 
 async function render() {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
@@ -155,6 +161,10 @@ test("ships the game systems and installable assets", async () => {
   assert.match(page, /不会真实扣款/);
   assert.match(page, /代币只保存在本设备/);
   assert.match(page, /currentPackage\.price !== selectedTopup\.price/);
+  for (const topup of NATURAL_DEFAULT_TOPUPS) {
+    assert.match(page, new RegExp(`id: "${topup.id}", price: ${topup.price}, coins: ${topup.coins}`));
+    assert.match(manager, new RegExp(`id: "${topup.id}", price: ${topup.price}, coins: ${topup.coins}`));
+  }
   assert.match(page, /setAttribute\("inert", ""\)/);
   assert.match(page, /topupConfirmRef/);
   assert.match(page, /BroadcastChannel/);
@@ -184,6 +194,9 @@ test("ships the game systems and installable assets", async () => {
   assert.match(manager, /PLAYER_SAVE_PREFIX \+ username/);
   assert.match(manager, /detail\.textContent = labels\[entry\.k\]/);
   assert.match(manager, /删除套餐/);
+  assert.match(manager, /defaultTopupTokens = 10/);
+  assert.match(manager, /defaultTopupTokens \* cfg\.economy\.myrPerToken/);
+  assert.match(manager, /defaultTopupTokens \* cfg\.economy\.coinsPerToken/);
   assert.match(manager, /\/api\/manager\/session/);
   assert.match(manager, /\/api\/manager\/password/);
   assert.match(manager, /method:\s*"DELETE"/);
@@ -203,7 +216,7 @@ test("ships the game systems and installable assets", async () => {
   assert.match(serviceWorker, /caches\.open\(CACHE\)/);
   assert.match(serviceWorker, /pathname\.startsWith\("\/api\/"\)/);
   assert.match(serviceWorker, /canonicalPathname/);
-  assert.match(serviceWorker, /const CACHE = "lucky-scratch-v12"/);
+  assert.match(serviceWorker, /const CACHE = "lucky-scratch-v13"/);
   assert.match(serviceWorker, /pathname === "\/manager\/"/);
   assert.match(serviceWorker, /pathname === "\/manager-login\/"/);
   assert.match(serviceWorker, /pathname === "\/manager-login\.html"/);
