@@ -202,7 +202,15 @@
     win:    { ic: "🎉", pos: true,  label: function (e) { return (e.n ? e.n + " " : "") + "中奖"; } },
     daily:  { ic: "🎁", pos: true,  label: function () { return "每日奖励"; } },
     rescue: { ic: "🛟", pos: true,  label: function () { return "每日救济"; } },
-    topup:  { ic: "🪙", pos: true,  label: function (e) { return "演示充值（未扣款）" + (e.n ? " · 参考价 " + e.n : ""); } }
+    topup:  { ic: "🪙", pos: true,  label: function (e) {
+      var detail = [];
+      if (typeof e.packageId === "string" && e.packageId.trim()) detail.push("套餐 " + e.packageId.trim().slice(0, 40));
+      var price = Number(e.priceMyr);
+      if (isFinite(price) && price >= 0) detail.push("RM " + price.toFixed(2));
+      else if (typeof e.n === "string" && e.n.trim()) detail.push(e.n.trim().slice(0, 80));
+      return "玩家充值（演示，未扣款）" + (detail.length ? " · " + detail.join(" · ") : "");
+    } },
+    developer: { ic: "🛠️", pos: true, label: function (e) { return "开发者试用" + (e.n ? " · " + String(e.n).slice(0, 80) : ""); } }
   };
   function renderLog() {
     var p = LuckyAuth.gameProgress();
@@ -229,8 +237,10 @@
       var small = document.createElement("small"); small.textContent = fmtTime(e.t);
       main.appendChild(b); main.appendChild(small);
       var val = document.createElement("span");
-      val.className = "log-amt " + (m.pos ? "pos" : "neg");
-      val.textContent = (m.pos ? "+" : "−") + LuckyAuth.formatCoins(Number(e.a) || 0);
+      var amount = Number(e.a) || 0;
+      var positive = e.k === "developer" ? amount >= 0 : m.pos;
+      val.className = "log-amt " + (positive ? "pos" : "neg");
+      val.textContent = (positive ? "+" : "−") + LuckyAuth.formatCoins(Math.abs(amount));
       row.appendChild(ic); row.appendChild(main); row.appendChild(val);
       list.appendChild(row);
     });

@@ -40,7 +40,14 @@ type Ticket = {
   totalWin: number;
   createdAt: number;
 };
-type LogEntry = { t: number; k: "buy" | "win" | "daily" | "rescue" | "topup"; a: number; n?: string };
+type LogEntry = {
+  t: number;
+  k: "buy" | "win" | "daily" | "rescue" | "topup" | "developer";
+  a: number;
+  n?: string;
+  packageId?: string;
+  priceMyr?: number;
+};
 type Player = {
   coins: number;
   level: number;
@@ -979,7 +986,14 @@ export default function Home() {
     const nextPlayer = {
       ...player,
       coins: Math.min(Number.MAX_SAFE_INTEGER, player.coins + currentPackage.coins),
-      log: pushLog(player.log, { t: Date.now(), k: "topup" as const, a: currentPackage.coins, n: `RM ${currentPackage.price.toFixed(2)}` }),
+      log: pushLog(player.log, {
+        t: Date.now(),
+        k: "topup" as const,
+        a: currentPackage.coins,
+        n: `RM ${currentPackage.price.toFixed(2)}`,
+        packageId: currentPackage.id,
+        priceMyr: currentPackage.price,
+      }),
     };
     try {
       localStorage.setItem(saveKeyRef.current, JSON.stringify({ player: nextPlayer, ticket, saveVersion: 1 }));
@@ -1012,8 +1026,26 @@ export default function Home() {
     tap.t = now;
     if (tap.n >= 5) { tap.n = 0; armDev(); }
   };
-  const devAddCoins = (amount: number) => setPlayer((current) => ({ ...current, coins: Math.max(0, Math.round(current.coins + amount)) }));
-  const devSetCoins = (amount: number) => setPlayer((current) => ({ ...current, coins: Math.max(0, Math.round(amount)) }));
+  const devAddCoins = (amount: number) => setPlayer((current) => {
+    const nextCoins = Math.max(0, Math.min(Number.MAX_SAFE_INTEGER, Math.round(current.coins + amount)));
+    const delta = nextCoins - current.coins;
+    if (delta === 0) return current;
+    return {
+      ...current,
+      coins: nextCoins,
+      log: pushLog(current.log, { t: Date.now(), k: "developer", a: delta, n: delta > 0 ? "增加余额" : "减少余额" }),
+    };
+  });
+  const devSetCoins = (amount: number) => setPlayer((current) => {
+    const nextCoins = Math.max(0, Math.min(Number.MAX_SAFE_INTEGER, Math.round(amount)));
+    const delta = nextCoins - current.coins;
+    if (delta === 0) return current;
+    return {
+      ...current,
+      coins: nextCoins,
+      log: pushLog(current.log, { t: Date.now(), k: "developer", a: delta, n: nextCoins === 0 ? "清空余额" : "设置余额" }),
+    };
+  });
   const applyCoinInput = () => {
     const amount = Number(coinInput);
     if (!Number.isFinite(amount)) return;

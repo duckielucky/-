@@ -284,7 +284,7 @@ test("ships the game systems and installable assets", async () => {
   assert.equal((manager.match(/保存所有未发布更改/g) ?? []).length, 2);
   assert.match(manager, /if \(normalizePlayerUsername\(\$\("playerLookup"\)\.value\)\) renderPlayerReport\(\)/);
   assert.match(manager, /PLAYER_SAVE_PREFIX \+ username/);
-  assert.match(manager, /detail\.textContent = labels\[entry\.k\]/);
+  assert.match(manager, /var detailParts = \[labels\[entry\.k\]\]/);
   assert.match(manager, /删除套餐/);
   assert.match(manager, /defaultTopupTokens = 10/);
   assert.match(manager, /defaultTopupTokens \* cfg\.economy\.myrPerToken/);
@@ -315,7 +315,7 @@ test("ships the game systems and installable assets", async () => {
   assert.match(serviceWorker, /caches\.open\(CACHE\)/);
   assert.match(serviceWorker, /pathname\.startsWith\("\/api\/"\)/);
   assert.match(serviceWorker, /canonicalPathname/);
-  assert.match(serviceWorker, /const CACHE = "lucky-scratch-v14"/);
+  assert.match(serviceWorker, /const CACHE = "lucky-scratch-v15"/);
   assert.match(serviceWorker, /pathname === "\/manager\/"/);
   assert.match(serviceWorker, /pathname === "\/manager-login\/"/);
   assert.match(serviceWorker, /pathname === "\/manager-login\.html"/);
@@ -346,7 +346,30 @@ test("removes the daily reward claim while preserving legacy history support", a
   assert.match(page, /<span>代币余额 · 充值<\/span>/);
   assert.match(page, /formatTokens/);
   assert.match(profile, /daily:\s*\{[^}]*每日奖励/s);
-  assert.match(profile, /topup:\s*\{[^}]*演示充值（未扣款）/s);
+  assert.match(profile, /topup:\s*\{[^}]*玩家充值（演示，未扣款）/s);
+});
+
+test("records player top-ups and labels developer balance changes in the transaction stream", async () => {
+  const [page, manager, profile, serviceWorker] = await Promise.all([
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../public/manager.html", import.meta.url), "utf8"),
+    readFile(new URL("../public/profile.html", import.meta.url), "utf8"),
+    readFile(new URL("../public/sw.js", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(page, /type LogEntry =[\s\S]*?"developer"/);
+  assert.match(page, /packageId:\s*currentPackage\.id/);
+  assert.match(page, /priceMyr:\s*currentPackage\.price/);
+  assert.match(page, /k:\s*"developer"/);
+  assert.match(page, /if \(delta === 0\) return current/);
+  assert.match(manager, /<h3>交易流<\/h3><span>最近 80 笔<\/span>/);
+  assert.match(manager, /developer:\s*"开发者试用"/);
+  assert.match(manager, /player\.log\.slice\(0, 80\)/);
+  assert.match(manager, /entry\.priceMyr/);
+  assert.match(manager, /entry\.k === "buy" \|\| signedAmount < 0/);
+  assert.match(profile, /developer:\s*\{[^}]*开发者试用/s);
+  assert.match(profile, /LuckyAuth\.formatCoins\(Math\.abs\(amount\)\)/);
+  assert.match(serviceWorker, /lucky-scratch-v15/);
 });
 
 test("creates, checks, and expires an HttpOnly signed manager session", async () => {
