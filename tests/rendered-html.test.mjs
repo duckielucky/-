@@ -304,6 +304,7 @@ test("ships the game systems and installable assets", async () => {
   assert.match(managerLoginPage, /--bg:#09040f/);
   assert.match(managerLoginPage, /--signal:#a83cff/);
   assert.match(managerLoginPage, /--cyan:#2ce9d3/);
+  assert.match(managerLoginPage, /url\("\/manager-login-background\.webp"\)/);
   assert.doesNotMatch(managerLoginPage, /themeToggle|lucky_mgr_theme|data-theme/);
   const managerAuthHtml = `${manager}\n${managerLoginPage}`;
   assert.doesNotMatch(managerAuthHtml, /\bprompt\b/i);
@@ -324,6 +325,7 @@ test("ships the game systems and installable assets", async () => {
   await access(new URL("../public/lottery-background.webp", import.meta.url));
   await access(new URL("../public/game-lottery-background.webp", import.meta.url));
   await access(new URL("../public/profile-lottery-background.webp", import.meta.url));
+  await access(new URL("../public/manager-login-background.webp", import.meta.url));
 });
 
 test("restored settled tickets do not replay the result poster", async () => {

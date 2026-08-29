@@ -20,10 +20,15 @@
   html,body{min-height:100%}
   body{
     margin:0;min-height:100dvh;display:grid;grid-template-rows:auto 1fr auto;
-    font-family:var(--font);color:var(--ink);background:
-      radial-gradient(circle at 50% -10%,#a83cff45 0,transparent 42%),
-      radial-gradient(circle at -8% 70%,#7c2eff24 0,transparent 35%),
-      linear-gradient(180deg,#0c0513 0%,var(--bg) 52%,#050208 100%);
+    font-family:var(--font);color:var(--ink);background-color:var(--bg);
+    background-image:
+      radial-gradient(circle at 50% -10%,#a83cff24 0,transparent 42%),
+      linear-gradient(180deg,#09040f30 0%,#09040f42 52%,#050208b8 100%),
+      url("/manager-login-background.webp");
+    background-position:center,center,center;
+    background-size:auto,auto,cover;
+    background-repeat:no-repeat;
+    background-attachment:fixed;
     -webkit-font-smoothing:antialiased;
   }
   body::before{
