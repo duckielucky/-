@@ -274,6 +274,8 @@ test("ships the game systems and installable assets", async () => {
   assert.match(manager, /--bg:#09040f/);
   assert.match(manager, /--cyan:#2ce9d3/);
   assert.match(manager, /--gold:#ffd76e/);
+  assert.match(manager, /<p class="sr" id="syncStatus"[^>]*aria-live="polite"/);
+  assert.doesNotMatch(manager, /class="sync-status"/);
   assert.match(manager, /function setManagerView\(/);
   assert.match(manager, /@media \(max-width:900px\)[\s\S]*?\.manager-nav\{/);
   assert.match(manager, /@media \(max-width:900px\)[\s\S]*?\.topbar\{[\s\S]*?height:58px/);
@@ -299,6 +301,10 @@ test("ships the game systems and installable assets", async () => {
   assert.match(managerLoginPage, /\/api\/manager\/session/);
   assert.match(managerLoginPage, /JSON\.stringify\(\{\s*username:\s*username\.value\.trim\(\),\s*password:\s*password\.value\s*\}\)/);
   assert.match(managerLoginPage, /credentials:\s*"same-origin"/);
+  assert.match(managerLoginPage, /--bg:#09040f/);
+  assert.match(managerLoginPage, /--signal:#a83cff/);
+  assert.match(managerLoginPage, /--cyan:#2ce9d3/);
+  assert.doesNotMatch(managerLoginPage, /themeToggle|lucky_mgr_theme|data-theme/);
   const managerAuthHtml = `${manager}\n${managerLoginPage}`;
   assert.doesNotMatch(managerAuthHtml, /\bprompt\b/i);
   assert.doesNotMatch(managerAuthHtml, /TOKEN_KEY|sessionStorage\.(?:getItem|setItem)/i);
