@@ -1,6 +1,6 @@
 const MANAGER_SESSION_PATH = "/api/manager/session";
 const MANAGER_LOGIN_PATH = "/manager-login.html";
-const MANAGER_USERNAME = "Admin";
+const DEFAULT_MANAGER_USERNAME = "Admin";
 const MANAGER_PAGE_PATHS = new Set(["/manager", "/manager/", "/manager.html"]);
 const MANAGER_COOKIE = "__Host-lucky-manager-session";
 const SESSION_TTL_SECONDS = 8 * 60 * 60;
@@ -9,6 +9,9 @@ const MIN_MANAGER_TOKEN_BYTES = 32;
 const MAX_MANAGER_TOKEN_BYTES = 4 * 1024;
 const MIN_MANAGER_PASSWORD_BYTES = 8;
 const MANAGER_PASSWORD_PATH = "/api/manager/password";
+const MANAGER_USERNAME_PATH = "/api/manager/username";
+const MIN_MANAGER_USERNAME_LENGTH = 3;
+const MAX_MANAGER_USERNAME_LENGTH = 32;
 const MIN_CHANGED_PASSWORD_LENGTH = 10;
 const MAX_CHANGED_PASSWORD_LENGTH = 128;
 const PASSWORD_SALT_BYTES = 16;
@@ -16,6 +19,10 @@ const PASSWORD_HASH_BYTES = 32;
 const PASSWORD_HASH_ALGORITHM = "hmac-sha256-v1";
 const PASSWORD_HASH_CONTEXT = "Lucky manager password hash\u0000v1\u0000";
 const MANAGER_SECRET_KEY = "manager";
+const MANAGER_ACCOUNT_KEY = "manager";
+const LOGIN_THROTTLE_MAX_FAILURES = 5;
+const LOGIN_THROTTLE_WINDOW_MS = 15 * 60 * 1000;
+const LOGIN_THROTTLE_KEY_CONTEXT = "Lucky manager login throttle\u0000v1\u0000";
 const KEY_DERIVATION_CONTEXT = "Lucky manager session signing key\u0000v1";
 const SIGNATURE_CONTEXT = "Lucky manager session cookie\u0000v1\u0000";
 const encoder = new TextEncoder();
@@ -48,11 +55,12 @@ export type ManagerSession = {
 };
 
 type SessionPayload = {
-  v: 1;
+  v: 2;
   iat: number;
   exp: number;
   nonce: string;
   host: string;
+  revision: string;
 };
 
 function authJson(payload: unknown, status = 200, extraHeaders?: HeadersInit): Response {
@@ -143,21 +151,39 @@ async function managerTokenMatches(candidate: string, expected: string): Promise
   return mismatch === 0;
 }
 
+async function managerLoginThrottleKey(request: Request, normalizedUsername: string, managerToken: string): Promise<string> {
+  const rootKey = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(managerToken),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const connectingIp = request.headers.get("cf-connecting-ip")?.trim().toLowerCase() || "unknown";
+  const digest = await crypto.subtle.sign(
+    "HMAC",
+    rootKey,
+    encoder.encode(`${LOGIN_THROTTLE_KEY_CONTEXT}${connectingIp}\u0000${normalizedUsername}`),
+  );
+  return bytesToBase64Url(new Uint8Array(digest));
+}
+
 function randomNonce(): string {
   const bytes = new Uint8Array(16);
   crypto.getRandomValues(bytes);
   return bytesToBase64Url(bytes);
 }
 
-async function issueManagerSession(request: Request, managerToken: string): Promise<{ value: string; session: ManagerSession }> {
+async function issueManagerSession(request: Request, managerToken: string, revision: string): Promise<{ value: string; session: ManagerSession }> {
   const issuedAt = Math.floor(Date.now() / 1000);
   const expiresAt = issuedAt + SESSION_TTL_SECONDS;
   const payload: SessionPayload = {
-    v: 1,
+    v: 2,
     iat: issuedAt,
     exp: expiresAt,
     nonce: randomNonce(),
     host: new URL(request.url).host,
+    revision,
   };
   const encodedPayload = bytesToBase64Url(encoder.encode(JSON.stringify(payload)));
   const signingKey = await deriveSessionSigningKey(managerToken);
@@ -249,7 +275,7 @@ export async function verifyManagerSession(request: Request, env: ManagerAuthEnv
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) return null;
   const candidate = payload as Partial<SessionPayload>;
   if (
-    candidate.v !== 1
+    candidate.v !== 2
     || typeof candidate.iat !== "number"
     || typeof candidate.exp !== "number"
     || !Number.isSafeInteger(candidate.iat)
@@ -257,6 +283,8 @@ export async function verifyManagerSession(request: Request, env: ManagerAuthEnv
     || typeof candidate.nonce !== "string"
     || !/^[A-Za-z0-9_-]{22}$/.test(candidate.nonce)
     || candidate.host !== new URL(request.url).host
+    || typeof candidate.revision !== "string"
+    || !/^\d+:\d+$/.test(candidate.revision)
   ) return null;
 
   const issuedAt = Number(candidate.iat);
@@ -268,6 +296,13 @@ export async function verifyManagerSession(request: Request, env: ManagerAuthEnv
     || expiresAt <= issuedAt
     || expiresAt - issuedAt > SESSION_TTL_SECONDS
   ) return null;
+  let currentRevision: string;
+  try {
+    currentRevision = await readManagerAuthRevision(env);
+  } catch {
+    return null;
+  }
+  if (candidate.revision !== currentRevision) return null;
   return { issuedAt, expiresAt };
 }
 
@@ -334,13 +369,137 @@ async function ensureManagerSecretTable(db: D1Database): Promise<void> {
   await managerSecretSchemaReady;
 }
 
-type StoredManagerPassword = { hash: string; salt: string; algorithm: string };
+type StoredManagerPassword = { hash: string; salt: string; algorithm: string; updatedAt: number };
+
+type ManagerUsername = { username: string; normalized: string };
+type StoredManagerAccount = { username: string; usernameNormalized: string; updatedAt: number };
+
+const CREATE_MANAGER_ACCOUNT_TABLE = `
+  CREATE TABLE IF NOT EXISTS manager_account (
+    key TEXT PRIMARY KEY NOT NULL,
+    username TEXT NOT NULL,
+    username_normalized TEXT NOT NULL UNIQUE,
+    updated_at INTEGER NOT NULL
+  ) WITHOUT ROWID
+`;
+let managerAccountSchemaReady: Promise<void> | null = null;
+
+type StoredManagerLoginThrottle = { failedAttempts: number; windowStartedAt: number };
+
+const CREATE_MANAGER_LOGIN_THROTTLE_TABLE = `
+  CREATE TABLE IF NOT EXISTS manager_login_throttle (
+    key TEXT PRIMARY KEY NOT NULL,
+    failed_attempts INTEGER NOT NULL,
+    window_started_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  ) WITHOUT ROWID
+`;
+let managerLoginThrottleSchemaReady: Promise<void> | null = null;
+
+function parseManagerUsername(value: unknown): ManagerUsername | null {
+  if (typeof value !== "string") return null;
+  const username = value.trim();
+  if (
+    username.length < MIN_MANAGER_USERNAME_LENGTH
+    || username.length > MAX_MANAGER_USERNAME_LENGTH
+    || !/^[A-Za-z][A-Za-z0-9_]*$/.test(username)
+  ) return null;
+  return { username, normalized: username.toLowerCase() };
+}
+
+async function ensureManagerAccountTable(db: D1Database): Promise<void> {
+  if (!managerAccountSchemaReady) {
+    managerAccountSchemaReady = db.prepare(CREATE_MANAGER_ACCOUNT_TABLE).run().then(() => undefined).catch((cause) => {
+      managerAccountSchemaReady = null;
+      throw cause;
+    });
+  }
+  await managerAccountSchemaReady;
+}
+
+async function ensureManagerLoginThrottleTable(db: D1Database): Promise<void> {
+  if (!managerLoginThrottleSchemaReady) {
+    managerLoginThrottleSchemaReady = db.prepare(CREATE_MANAGER_LOGIN_THROTTLE_TABLE).run().then(() => undefined).catch((cause) => {
+      managerLoginThrottleSchemaReady = null;
+      throw cause;
+    });
+  }
+  await managerLoginThrottleSchemaReady;
+}
+
+async function managerLoginRetryAfter(db: D1Database, key: string, now: number): Promise<number | null> {
+  await ensureManagerLoginThrottleTable(db);
+  const row = await db.prepare(
+    "SELECT failed_attempts AS failedAttempts, window_started_at AS windowStartedAt FROM manager_login_throttle WHERE key = ?1",
+  ).bind(key).first<StoredManagerLoginThrottle>();
+  if (!row) return null;
+  const failedAttempts = Number(row.failedAttempts);
+  const windowStartedAt = Number(row.windowStartedAt);
+  if (!Number.isSafeInteger(failedAttempts) || failedAttempts < 0 || !Number.isSafeInteger(windowStartedAt) || windowStartedAt < 0) {
+    throw new Error("Stored manager login throttle is invalid");
+  }
+  const remainingMs = windowStartedAt + LOGIN_THROTTLE_WINDOW_MS - now;
+  if (failedAttempts < LOGIN_THROTTLE_MAX_FAILURES || remainingMs <= 0) return null;
+  return Math.max(1, Math.min(LOGIN_THROTTLE_WINDOW_MS / 1000, Math.ceil(remainingMs / 1000)));
+}
+
+async function recordManagerLoginFailure(db: D1Database, key: string, now: number): Promise<void> {
+  await ensureManagerLoginThrottleTable(db);
+  const staleBefore = now - LOGIN_THROTTLE_WINDOW_MS;
+  await db.prepare("DELETE FROM manager_login_throttle WHERE updated_at <= ?1").bind(staleBefore).run();
+  await db.prepare(
+    "INSERT INTO manager_login_throttle (key, failed_attempts, window_started_at, updated_at) VALUES (?1, 1, ?2, ?2) "
+    + "ON CONFLICT(key) DO UPDATE SET "
+    + "failed_attempts = CASE WHEN window_started_at <= ?3 THEN 1 ELSE failed_attempts + 1 END, "
+    + "window_started_at = CASE WHEN window_started_at <= ?3 THEN ?2 ELSE window_started_at END, "
+    + "updated_at = ?2",
+  ).bind(key, now, staleBefore).run();
+}
+
+async function clearManagerLoginFailures(db: D1Database, key: string): Promise<void> {
+  await ensureManagerLoginThrottleTable(db);
+  await db.prepare("DELETE FROM manager_login_throttle WHERE key = ?1").bind(key).run();
+}
+
+async function readStoredManagerAccount(db: D1Database): Promise<StoredManagerAccount | null> {
+  await ensureManagerAccountTable(db);
+  return db.prepare(
+    "SELECT username, username_normalized AS usernameNormalized, updated_at AS updatedAt FROM manager_account WHERE key = ?1",
+  ).bind(MANAGER_ACCOUNT_KEY).first<StoredManagerAccount>();
+}
+
+async function readManagerUsername(env: ManagerAuthEnv): Promise<ManagerUsername> {
+  if (!env.DB) return { username: DEFAULT_MANAGER_USERNAME, normalized: DEFAULT_MANAGER_USERNAME.toLowerCase() };
+  const stored = await readStoredManagerAccount(env.DB);
+  if (!stored) return { username: DEFAULT_MANAGER_USERNAME, normalized: DEFAULT_MANAGER_USERNAME.toLowerCase() };
+  const parsed = parseManagerUsername(stored.username);
+  if (!parsed || parsed.normalized !== stored.usernameNormalized) throw new Error("Stored manager username is invalid");
+  return parsed;
+}
+
+async function storeManagerUsername(db: D1Database, value: ManagerUsername): Promise<void> {
+  const current = await readStoredManagerAccount(db);
+  const updatedAt = Math.max(Date.now(), Number(current?.updatedAt || 0) + 1);
+  await db.prepare(
+    "INSERT INTO manager_account (key, username, username_normalized, updated_at) VALUES (?1, ?2, ?3, ?4) "
+    + "ON CONFLICT(key) DO UPDATE SET username = excluded.username, username_normalized = excluded.username_normalized, updated_at = excluded.updated_at",
+  ).bind(MANAGER_ACCOUNT_KEY, value.username, value.normalized, updatedAt).run();
+}
 
 async function readStoredManagerPassword(db: D1Database): Promise<StoredManagerPassword | null> {
   await ensureManagerSecretTable(db);
-  return db.prepare("SELECT hash, salt, algorithm FROM manager_secret WHERE key = ?1")
+  return db.prepare("SELECT hash, salt, algorithm, updated_at AS updatedAt FROM manager_secret WHERE key = ?1")
     .bind(MANAGER_SECRET_KEY)
     .first<StoredManagerPassword>();
+}
+
+async function readManagerAuthRevision(env: ManagerAuthEnv): Promise<string> {
+  if (!env.DB) return "0:0";
+  const [account, secret] = await Promise.all([
+    readStoredManagerAccount(env.DB),
+    readStoredManagerPassword(env.DB),
+  ]);
+  return `${Number(account?.updatedAt || 0)}:${Number(secret?.updatedAt || 0)}`;
 }
 
 async function derivePasswordHash(password: string, salt: Uint8Array, managerToken: string): Promise<Uint8Array> {
@@ -372,14 +531,15 @@ async function storedManagerPasswordMatches(candidate: string, row: StoredManage
 }
 
 async function storeManagerPassword(db: D1Database, password: string, managerToken: string): Promise<void> {
-  await ensureManagerSecretTable(db);
+  const current = await readStoredManagerPassword(db);
   const salt = new Uint8Array(PASSWORD_SALT_BYTES);
   crypto.getRandomValues(salt);
   const hash = await derivePasswordHash(password, salt, managerToken);
+  const updatedAt = Math.max(Date.now(), Number(current?.updatedAt || 0) + 1);
   await db.prepare(
     "INSERT INTO manager_secret (key, hash, salt, algorithm, updated_at) VALUES (?1, ?2, ?3, ?4, ?5) "
     + "ON CONFLICT(key) DO UPDATE SET hash = excluded.hash, salt = excluded.salt, algorithm = excluded.algorithm, updated_at = excluded.updated_at",
-  ).bind(MANAGER_SECRET_KEY, bytesToBase64Url(hash), bytesToBase64Url(salt), PASSWORD_HASH_ALGORITHM, Date.now()).run();
+  ).bind(MANAGER_SECRET_KEY, bytesToBase64Url(hash), bytesToBase64Url(salt), PASSWORD_HASH_ALGORITHM, updatedAt).run();
 }
 
 /**
@@ -407,7 +567,13 @@ async function verifyLoginCredential(candidate: string, env: ManagerAuthEnv): Pr
   }
   const managerPassword = configuredManagerPassword(env);
   if (!managerPassword) return false;
-  return managerTokenMatches(candidate, managerPassword);
+  const [passwordMatches, recoveryMatches] = await Promise.all([
+    managerTokenMatches(candidate, managerPassword),
+    recoveryToken && recoveryToken !== managerPassword
+      ? managerTokenMatches(candidate, recoveryToken)
+      : Promise.resolve(false),
+  ]);
+  return passwordMatches || recoveryMatches;
 }
 
 async function readPasswordChange(request: Request): Promise<{ currentPassword: string; newPassword: string } | null> {
@@ -429,6 +595,25 @@ async function readPasswordChange(request: Request): Promise<{ currentPassword: 
   }
 }
 
+async function readUsernameChange(request: Request): Promise<{ currentPassword: string; newUsername: string } | null> {
+  const contentType = (request.headers.get("content-type") || "").split(";", 1)[0].trim().toLowerCase();
+  if (contentType !== "application/json") return null;
+  const contentLength = request.headers.get("content-length");
+  if (contentLength !== null && (!/^\d+$/.test(contentLength.trim()) || Number(contentLength) > LOGIN_BODY_LIMIT_BYTES)) return null;
+  const raw = await readBodyWithinLimit(request, LOGIN_BODY_LIMIT_BYTES);
+  if (raw === null) return null;
+  try {
+    const body = JSON.parse(raw) as unknown;
+    if (!body || typeof body !== "object" || Array.isArray(body)) return null;
+    const currentPassword = (body as { currentPassword?: unknown }).currentPassword;
+    const newUsername = (body as { newUsername?: unknown }).newUsername;
+    if (typeof currentPassword !== "string" || typeof newUsername !== "string") return null;
+    return { currentPassword, newUsername };
+  } catch {
+    return null;
+  }
+}
+
 async function handleManagerPasswordChange(request: Request, env: ManagerAuthEnv): Promise<Response> {
   if (request.method !== "POST") return authJson({ error: "Method not allowed" }, 405, { allow: "POST" });
   const originError = strictSameOriginError(request);
@@ -444,18 +629,55 @@ async function handleManagerPasswordChange(request: Request, env: ManagerAuthEnv
     return authError(`The new password must be ${MIN_CHANGED_PASSWORD_LENGTH}-${MAX_CHANGED_PASSWORD_LENGTH} characters`, 422);
   }
   if (body.newPassword === body.currentPassword) return authError("The new password must differ from the current one", 422);
+  let replacementSession: { value: string; session: ManagerSession };
   try {
     await storeManagerPassword(env.DB, body.newPassword, managerToken);
+    replacementSession = await issueManagerSession(request, managerToken, await readManagerAuthRevision(env));
   } catch {
     return authError("Could not save the new password. Try again.", 503);
   }
-  return authJson({ ok: true });
+  return authJson({ ok: true }, 200, { "set-cookie": sessionCookie(replacementSession.value) });
+}
+
+async function handleManagerUsernameChange(request: Request, env: ManagerAuthEnv): Promise<Response> {
+  if (request.method !== "POST") return authJson({ error: "Method not allowed" }, 405, { allow: "POST" });
+  const originError = strictSameOriginError(request);
+  if (originError) return originError;
+  const managerToken = configuredManagerToken(env);
+  if (!managerToken) return authError("Manager authentication is not configured", 503);
+  if (!(await verifyManagerSession(request, env))) return authError("Manager session is invalid or expired", 401);
+  if (!env.DB) return authError("Manager account storage is unavailable", 503);
+  const body = await readUsernameChange(request);
+  if (body === null) return authError("The request is invalid", 400);
+  if (!(await verifyLoginCredential(body.currentPassword, env))) return authError("The current password is incorrect", 401);
+  const nextUsername = parseManagerUsername(body.newUsername);
+  if (!nextUsername) {
+    return authError(
+      `The username must be ${MIN_MANAGER_USERNAME_LENGTH}-${MAX_MANAGER_USERNAME_LENGTH} characters, start with a letter, and contain only letters, numbers, or underscores`,
+      422,
+    );
+  }
+  let replacementSession: { value: string; session: ManagerSession };
+  try {
+    const current = await readManagerUsername(env);
+    if (current.normalized === nextUsername.normalized) return authError("The new username must differ from the current one", 422);
+    await storeManagerUsername(env.DB, nextUsername);
+    replacementSession = await issueManagerSession(request, managerToken, await readManagerAuthRevision(env));
+  } catch {
+    return authError("Could not save the manager username. Try again.", 503);
+  }
+  return authJson(
+    { ok: true, username: nextUsername.username },
+    200,
+    { "set-cookie": sessionCookie(replacementSession.value) },
+  );
 }
 
 export async function handleManagerAuthApi(request: Request, env: ManagerAuthEnv): Promise<Response | null> {
   const pathname = canonicalPathname(new URL(request.url).pathname);
   if (pathname === null) return authError("The request path is invalid", 400);
   if (pathname === MANAGER_PASSWORD_PATH) return handleManagerPasswordChange(request, env);
+  if (pathname === MANAGER_USERNAME_PATH) return handleManagerUsernameChange(request, env);
   if (pathname !== MANAGER_SESSION_PATH) return null;
 
   if (request.method === "GET") {
@@ -464,7 +686,12 @@ export async function handleManagerAuthApi(request: Request, env: ManagerAuthEnv
     if (!session) {
       return authJson({ authenticated: false }, 401, { "set-cookie": expiredSessionCookie() });
     }
-    return authJson({ authenticated: true, username: MANAGER_USERNAME, expiresAt: session.expiresAt });
+    try {
+      const managerUsername = await readManagerUsername(env);
+      return authJson({ authenticated: true, username: managerUsername.username, expiresAt: session.expiresAt });
+    } catch {
+      return authError("Manager account storage is unavailable", 503);
+    }
   }
 
   if (request.method === "POST") {
@@ -475,13 +702,49 @@ export async function handleManagerAuthApi(request: Request, env: ManagerAuthEnv
     if (!managerToken || !managerPassword) return authError("Manager authentication is not configured", 503);
     const credentials = await readLoginCredentials(request);
     if (credentials === null) return authError("The login request is invalid", 400);
-    if (
-      credentials.username.toLowerCase() !== MANAGER_USERNAME.toLowerCase()
-      || !(await verifyLoginCredential(credentials.password, env))
-    ) return authError("Manager credentials are invalid", 401);
-    const { value, session } = await issueManagerSession(request, managerToken);
+    const normalizedCandidateUsername = credentials.username.toLowerCase();
+    let throttleKey: string | null = null;
+    if (env.DB) {
+      try {
+        throttleKey = await managerLoginThrottleKey(request, normalizedCandidateUsername, managerToken);
+        const retryAfter = await managerLoginRetryAfter(env.DB, throttleKey, Date.now());
+        if (retryAfter !== null) {
+          return authError("Too many login attempts. Try again later.", 429, { "retry-after": String(retryAfter) });
+        }
+      } catch {
+        return authError("Manager login is temporarily unavailable", 503);
+      }
+    }
+    let managerUsername: ManagerUsername;
+    try {
+      managerUsername = await readManagerUsername(env);
+    } catch {
+      return authError("Manager account storage is unavailable", 503);
+    }
+    const [usernameMatches, passwordMatches] = await Promise.all([
+      managerTokenMatches(normalizedCandidateUsername, managerUsername.normalized),
+      verifyLoginCredential(credentials.password, env),
+    ]);
+    if (!usernameMatches || !passwordMatches) {
+      if (env.DB && throttleKey) {
+        try {
+          await recordManagerLoginFailure(env.DB, throttleKey, Date.now());
+        } catch {
+          return authError("Manager login is temporarily unavailable", 503);
+        }
+      }
+      return authError("Manager credentials are invalid", 401);
+    }
+    let revision: string;
+    try {
+      if (env.DB && throttleKey) await clearManagerLoginFailures(env.DB, throttleKey);
+      revision = await readManagerAuthRevision(env);
+    } catch {
+      return authError("Manager account storage is unavailable", 503);
+    }
+    const { value, session } = await issueManagerSession(request, managerToken, revision);
     return authJson(
-      { authenticated: true, username: MANAGER_USERNAME, expiresAt: session.expiresAt },
+      { authenticated: true, username: managerUsername.username, expiresAt: session.expiresAt },
       200,
       { "set-cookie": sessionCookie(value) },
     );

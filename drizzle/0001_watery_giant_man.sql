@@ -1,4 +1,4 @@
-CREATE TABLE `manager_secret` (
+CREATE TABLE IF NOT EXISTS `manager_secret` (
 	`key` text PRIMARY KEY NOT NULL,
 	`hash` text NOT NULL,
 	`salt` text NOT NULL,

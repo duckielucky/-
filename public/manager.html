@@ -149,7 +149,8 @@
   .manager-nav-copy{min-width:0;display:grid}
   .manager-nav-copy b{font-size:13px;font-weight:650;color:inherit;white-space:nowrap}
   .manager-view-head{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:1px}
-  .manager-view-head h2{margin:0;font-size:22px;line-height:1.25;letter-spacing:-.025em}
+  .manager-view-head h2{margin:0;font-size:22px;line-height:1.25;letter-spacing:-.025em;scroll-margin-top:96px}
+  .manager-view-head h2:focus{outline:2px solid var(--cyan);outline-offset:4px;border-radius:4px}
   .manager-view-badge{
     flex:none;padding:4px 9px;border:1px solid var(--line);border-radius:999px;
     color:var(--dim);background:var(--panel);font-size:10px;font-weight:650;
@@ -808,25 +809,179 @@
   :root[data-theme="dark"] .help-back{background:rgba(0,0,0,.55)}
   :root[data-theme="dark"] .mobar{background:rgba(28,28,30,.82)}
 
+  /* ============================================================
+     LUCKY DARK PURPLE — shared with the actual game
+     ============================================================ */
+  :root,
+  :root[data-theme="dark"]{
+    color-scheme:dark;
+    --bg:#09040f;--panel:#16091f;--panel-2:#100716;
+    --ink:#fbf8ff;--muted:#b4a7c4;--dim:#897d98;
+    --cyan:#2ce9d3;--gold:#ffd76e;--danger:#e0554d;--warn:#e6b53c;--ok:#37c07a;
+    --line:#ffffff14;--line-strong:#ffffff28;
+    --accent:#a83cff;--accent-2:#7c2eff;
+    --signal:#a83cff;--signal-2:#7c2eff;
+    --radius:18px;
+  }
+  html{color-scheme:dark}
+  body{
+    color:var(--ink);
+    background-color:var(--bg);
+    background-image:
+      radial-gradient(circle at 48% -12%,#a83cff38 0,transparent 46%),
+      radial-gradient(circle at -8% 58%,#7520ab1c 0,transparent 34%),
+      linear-gradient(180deg,#09040f 0%,#06020a 100%);
+    background-attachment:fixed;
+  }
+  body::before{
+    display:block;background-image:radial-gradient(#ffffff48 .65px,transparent .65px);
+    background-size:8px 8px;opacity:.2;
+    -webkit-mask-image:linear-gradient(to bottom,#000,transparent 76%);
+    mask-image:linear-gradient(to bottom,#000,transparent 76%);
+  }
+  .topbar{
+    background:#0f0616d9;border-bottom-color:var(--line);
+    backdrop-filter:blur(20px) saturate(1.2);-webkit-backdrop-filter:blur(20px) saturate(1.2);
+  }
+  .brand-mark{
+    border-radius:11px!important;border:1px solid #c26bff66;
+    background:linear-gradient(145deg,var(--accent),#6c23d6)!important;
+    color:#fff;box-shadow:0 0 22px #a83cff4d!important;font-weight:900;
+  }
+  .brand h1{color:var(--ink);font-weight:800;letter-spacing:.02em}
+  .brand p{color:var(--dim);font-size:11px;font-weight:600}
+  .btn{
+    min-height:40px;border-radius:11px;border:1px solid var(--line-strong);
+    background:#ffffff0a;color:var(--ink);font-weight:650;
+  }
+  .btn:hover{background:#ffffff14;border-color:#ffffff40}
+  .btn:focus-visible,.manager-nav-btn:focus-visible,.tier-btn:focus-visible,
+  .player-search:focus-within{outline:2px solid var(--cyan);outline-offset:2px}
+  .btn-primary{
+    border-color:#8bfff3;color:#061b17;font-weight:850;
+    background:linear-gradient(180deg,#4effe8,#20c8b9);
+    box-shadow:0 0 22px #24e6d03d,inset 0 1px #ffffff80;
+  }
+  .btn-primary:hover{background:linear-gradient(180deg,#72fff0,#29d7c7);border-color:#bafff8}
+  .btn-danger{color:#ff847e;border-color:#e0554d4d;background:#e0554d12}
+  .btn-danger:hover{background:#e0554d24;border-color:#e0554d80}
+  .dirty{background:#e6b53c14;border-color:#e6b53c4d;color:var(--gold)}
+  .sync-status[data-state="synced"]{background:#37c07a14;color:#6be3a1;border-color:#37c07a4d}
+  .card{
+    border:1px solid var(--line);border-radius:var(--radius);
+    background:linear-gradient(155deg,#281238eb,#16091ff0 48%,#0d0713f7);
+    box-shadow:0 22px 64px #000a,inset 0 1px #ffffff14,0 0 34px #a83cff12;
+  }
+  .manager-nav-btn{background:#16091fa6;border-color:var(--line);border-radius:12px}
+  .manager-nav-btn:hover{background:#ffffff0d;border-color:var(--line-strong)}
+  .manager-nav-btn.on{background:linear-gradient(100deg,#a83cff2b,#2ce9d309);border-color:#a83cff80}
+  .manager-nav-btn.on::before{
+    content:"";position:absolute;left:-1px;top:11px;bottom:11px;width:3px;border-radius:0 6px 6px 0;
+    background:linear-gradient(var(--accent),var(--cyan));box-shadow:0 0 14px #2ce9d373;
+  }
+  .manager-nav-btn{position:relative}
+  .manager-nav-index{background:#ffffff0a;color:var(--dim)}
+  .manager-nav-btn.on .manager-nav-index{background:#a83cff33;color:#d9a5ff}
+  .manager-view-badge,.sec-head .tag{
+    border:1px solid #a83cff38;background:#a83cff18;color:#d9a5ff;border-radius:999px;font-weight:700;
+  }
+  .tier-btn{background:#16091f;border-color:var(--line);box-shadow:inset 0 1px #ffffff0a}
+  .tier-btn:hover{background:#21102d;border-color:var(--line-strong)}
+  .tier-btn.on{background:color-mix(in srgb,var(--ta) 13%,#16091f);border-color:color-mix(in srgb,var(--ta) 58%,transparent)}
+  .sec-head h2,.overview h3,.sim h3{color:var(--ink);font-weight:800}
+  .info{background:#a83cff14;border-color:#a83cff59;color:#d9a5ff}
+  .info:hover{background:#a83cff3d;border-color:#a83cff;color:#fff}
+  .chipbox,.formula{background:#100716;border-color:var(--line)}
+  .chip,.chip.mult,.chip-add,.quickadd button{
+    background:#16091f;border-color:var(--line-strong);color:var(--ink);box-shadow:inset 0 1px #ffffff0a;
+  }
+  .chip b,.chip.mult{color:var(--gold)}
+  .chip .x{background:#ffffff12;color:var(--muted)}
+  .quickadd button:hover,.chip-add:hover{background:#21102d;color:var(--cyan)}
+  .field input,.field select,.odds-cell,.odds-cell input,.swatch input[type=color]{
+    background:#100716;border-color:var(--line-strong);color:var(--ink);border-radius:11px;
+  }
+  .field input:focus,.field select:focus,.chipbox:focus-within,.chip-add:focus,.odds-cell input:focus{
+    border-color:var(--cyan);box-shadow:0 0 0 2px #2ce9d32e;
+  }
+  .odds-bar{background:#ffffff12}.odds-bar i{background:linear-gradient(90deg,var(--accent),var(--cyan))}
+  .breakdown,.sim-out{background:var(--line)}
+  .breakdown div,.sim-out div,tr.cur td{background:#100716}
+  .help,.help header{background:#16091f;border-color:var(--line)}
+  .help-back{background:#050207cc;backdrop-filter:blur(8px)}
+  .help-body p,.help-body li{color:#cbbfd6}.help-body code,.help-x{background:#100716}
+  .toast{background:#24132cf2;color:#f6eaff;border-color:#ffffff25;box-shadow:0 10px 40px #000a}
+  .economy-summary span,.player-stats div,.player-log-row{background:#100716}
+  .player-stats{background:var(--line)}
+  .player-search{
+    display:grid;grid-template-columns:36px minmax(0,1fr) auto;align-items:center;
+    gap:4px;padding:5px;border:1px solid var(--line-strong);border-radius:13px;background:#100716;
+  }
+  .player-search-icon{display:grid;place-items:center;color:var(--dim);font-size:20px}
+  .player-search input{height:40px;min-width:0;border:0;background:transparent;color:var(--ink);outline:0;font-size:14px}
+  .player-search input::placeholder{color:#71647f}
+  .player-search .btn{min-height:40px;padding:0 18px;border-color:#a83cff59;background:#a83cff24;color:#d9a5ff}
+  .category-save{
+    position:sticky;bottom:18px;z-index:12;display:flex;align-items:center;justify-content:space-between;gap:16px;
+    padding:12px 12px 12px 16px;border:1px solid #2ce9d340;border-radius:18px;
+    background:#16091ff2;backdrop-filter:blur(18px);box-shadow:0 18px 60px #000b;
+  }
+  .category-save-copy{display:grid;gap:2px}.category-save-copy b{font-size:13px}.category-save-copy span{color:var(--dim);font-size:11px}
+  .category-save .btn{min-width:150px}
+  .account-identity{display:grid;gap:16px}
+  .account-current{display:flex;align-items:center;gap:12px}
+  .account-avatar{width:44px;height:44px;display:grid;place-items:center;border:1px solid #a83cff4d;border-radius:13px;background:#a83cff20;color:#d9a5ff;font-size:20px;font-weight:850}
+  .account-current-copy{display:grid}.account-current-copy span{color:var(--dim);font-size:11px}.account-current-copy strong{font-size:16px}
+  .account-username-form{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;gap:10px;align-items:end}
+  .account-username-actions{display:grid;gap:6px}
+  .username-error{min-height:18px;color:var(--danger);font-size:11px}.username-error.ok{color:var(--ok)}
+  .account-security{display:flex;align-items:center;justify-content:space-between;gap:16px}
+  .account-security-copy{display:grid;gap:2px}.account-security-copy b{font-size:14px}.account-security-copy span{color:var(--dim);font-size:11px}
+
+  @media (max-width:760px){
+    .topbar{padding:11px 14px}.brand h1{font-size:13px}.brand p{display:none}
+    .actions{display:none}.sync-status span{display:none}.sync-status{width:36px;justify-content:center;padding:0}
+    .wrap{padding:0 14px 112px}
+    .manager-nav{position:sticky!important;top:58px!important;z-index:24;margin:0 -14px 14px!important;padding:9px 14px!important;background:#09040fe8;backdrop-filter:blur(18px);border-bottom:1px solid var(--line)}
+    .manager-nav-btn{min-width:max-content!important;grid-template-columns:1fr!important;min-height:42px!important;padding:8px 14px!important;border-radius:999px!important}
+    .manager-nav-index{display:none}.manager-nav-btn.on::before{left:20px;right:20px;top:auto;bottom:-3px;width:auto;height:2px}
+    .category-save{position:fixed;left:12px;right:12px;bottom:max(10px,env(safe-area-inset-bottom));padding:10px;border-radius:17px}
+    .category-save-copy{display:none}.category-save .btn{width:100%}
+    .account-username-form{grid-template-columns:1fr}.account-security{align-items:flex-start;flex-direction:column}
+    .player-search{grid-template-columns:34px minmax(0,1fr)}.player-search .btn{grid-column:1/-1;width:100%}
+  }
+
   /* The manager categories become a compact top bar on phones. */
   @media (max-width:900px){
+    .topbar{
+      height:58px;box-sizing:border-box;padding:8px 14px;gap:10px;
+    }
+    .brand{flex:1;overflow:hidden}
+    .brand-mark{width:32px;height:32px}
+    .brand h1{font-size:13px;overflow:hidden;text-overflow:ellipsis}
+    .brand p,.brand .info,.actions,.dirty{display:none!important}
+    .sync-status{width:36px;min-height:36px;justify-content:center;padding:0}
+    .sync-status span{display:none}
+    .wrap{grid-template-columns:1fr}
     .manager-nav{
-      position:static;display:flex;gap:7px;overflow-x:auto;
-      margin:0 -14px;padding:0 14px 3px;scrollbar-width:none;
+      position:sticky;top:58px;z-index:24;display:flex;gap:7px;overflow-x:auto;
+      margin:0 -14px 14px;padding:9px 14px;background:#09040fe8;
+      border-bottom:1px solid var(--line);backdrop-filter:blur(18px);scrollbar-width:none;
       scroll-snap-type:x proximity;
     }
     .manager-nav::-webkit-scrollbar{display:none}
     .manager-nav-label{display:none}
     .manager-nav-btn{
-      flex:0 0 auto;min-width:128px;min-height:48px;padding:8px 11px;
-      grid-template-columns:26px minmax(0,1fr);scroll-snap-align:start;
+      flex:0 0 auto;min-width:max-content;min-height:42px;padding:8px 14px;
+      grid-template-columns:1fr;border-radius:999px;scroll-snap-align:start;
     }
-    .manager-nav-index{width:26px;height:26px}
+    .manager-nav-index{display:none}
+    .manager-nav-btn.on::before{left:20px;right:20px;top:auto;bottom:-3px;width:auto;height:2px}
     .manager-single-view .editor{grid-column:1;width:100%}
     .editor>.tiers{display:flex}
     .rail{grid-column:1}
     .manager-view-head{align-items:flex-start}
-    .manager-view-head h2{font-size:20px}
+    .manager-view-head h2{font-size:20px;scroll-margin-top:138px}
     .account-summary{grid-template-columns:1fr}
     .account-actions{justify-content:flex-start}
     body[data-manager-view="players"] .mobar,
@@ -856,18 +1011,15 @@
     <div>
       <h1>幸运刮刮乐 · 运营后台</h1>
       <p id="managerIdentity">Admin</p>
-      <button class="info" type="button" data-help="guide" aria-label="使用说明" style="margin-top:5px">i</button>
     </div>
   </div>
   <div class="topbar-spacer"></div>
   <div class="sync-status" id="syncStatus" data-state="loading" role="status"><i></i><span>正在连接云端</span></div>
   <div class="dirty" id="dirty"><i></i>有未保存的更改</div>
-  <button class="btn theme-toggle" id="themeToggle" type="button" title="切换深色 / 浅色">☾</button>
   <div class="actions">
     <button class="btn" id="btnExport">导出配置</button>
     <button class="btn" id="btnImport">导入配置</button>
     <button class="btn btn-danger" id="btnReset">恢复默认</button>
-    <button class="btn btn-primary" id="btnSave" disabled>保存并应用</button>
   </div>
   <input type="file" id="fileInput" accept="application/json,.json" class="sr" />
 </header>
@@ -1033,6 +1185,11 @@
       </div>
     </section>
 
+    <div class="category-save" data-manager-section="tickets">
+      <div class="category-save-copy"><b>发布设置</b><span>保存所有未发布更改</span></div>
+      <button class="btn btn-primary" type="button" data-save-config="tickets" disabled>保存并应用</button>
+    </div>
+
     <!-- 虚拟代币充值套餐（全局） -->
     <section class="card sec" data-manager-section="topups" hidden>
       <div class="sec-head">
@@ -1047,6 +1204,11 @@
       <p class="topup-hint">这里设置游戏内显示的套餐价格与虚拟代币数量。当前版本为演示充值，不会真实扣款；删除全部套餐会关闭游戏内充值入口。</p>
     </section>
 
+    <div class="category-save" data-manager-section="topups" hidden>
+      <div class="category-save-copy"><b>发布设置</b><span>保存所有未发布更改</span></div>
+      <button class="btn btn-primary" type="button" data-save-config="topups" disabled>保存并应用</button>
+    </div>
+
     <!-- 同一浏览器上的玩家记录 -->
     <section class="card sec" data-manager-section="players" hidden>
       <div class="sec-head">
@@ -1054,14 +1216,14 @@
         <span class="tag">仅此浏览器</span>
         <button class="info" type="button" data-help="player" aria-label="玩家记录怎么用">i</button>
       </div>
-      <div class="player-report-controls">
-        <div class="field">
-          <label for="playerLookup">玩家用户名</label>
-          <input id="playerLookup" type="text" value="testplayer" maxlength="20" autocomplete="off" autocapitalize="none" spellcheck="false" />
-        </div>
-        <button class="btn" id="btnPlayerLookup" type="button">读取记录</button>
-      </div>
-      <p class="player-report-meta" id="playerReportMeta">输入玩家用户名后读取本浏览器保存的游戏进度。不会显示密码或安全资料。</p>
+      <form class="player-search" id="playerSearchForm" role="search" novalidate>
+        <label class="sr" for="playerLookup">搜索玩家用户名</label>
+        <span class="player-search-icon" aria-hidden="true">⌕</span>
+        <input id="playerLookup" name="player" type="search" list="playerNameOptions" placeholder="搜索玩家用户名…" maxlength="20" autocomplete="off" autocapitalize="none" spellcheck="false" enterkeyhint="search" />
+        <datalist id="playerNameOptions"></datalist>
+        <button class="btn" id="btnPlayerLookup" type="submit">搜索</button>
+      </form>
+      <p class="player-report-meta" id="playerReportMeta">搜索本浏览器保存的玩家记录。不会显示密码或安全资料。</p>
       <div class="player-stats" id="playerStats" hidden>
         <div><span>代币余额</span><b id="playerBalance">—</b></div>
         <div><span>已刮票数</span><b id="playerTickets">—</b></div>
@@ -1078,23 +1240,41 @@
         <h2>账户设置</h2>
         <span class="tag">安全会话</span>
       </div>
-      <div class="account-summary">
-        <div class="account-copy">
-          <span>当前管理员</span>
-          <strong id="managerIdentityAccount">Admin</strong>
-          <span>修改密码会影响下次登录；退出会结束本次浏览器会话。</span>
+      <div class="account-identity">
+        <div class="account-current">
+          <div class="account-avatar" id="managerAvatar" aria-hidden="true">A</div>
+          <div class="account-current-copy">
+            <span>当前管理员</span>
+            <strong id="managerIdentityAccount">Admin</strong>
+          </div>
         </div>
+        <form class="account-username-form" id="managerUsernameForm" novalidate>
+          <div class="field">
+            <label for="managerUsernameNew">管理员用户名</label>
+            <input id="managerUsernameNew" name="username" type="text" minlength="3" maxlength="32" pattern="[A-Za-z][A-Za-z0-9_]{2,31}" autocomplete="username" autocapitalize="none" spellcheck="false" />
+          </div>
+          <div class="field">
+            <label for="managerUsernamePassword">当前密码</label>
+            <input id="managerUsernamePassword" type="password" autocomplete="current-password" />
+          </div>
+          <div class="account-username-actions">
+            <button class="btn btn-primary" id="btnChangeUsername" type="submit">保存用户名</button>
+            <span class="username-error" id="usernameError" role="alert" aria-live="polite"></span>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <section class="card sec" data-manager-section="account" hidden>
+      <div class="sec-head"><h2>账户安全</h2><span class="tag">安全会话</span></div>
+      <div class="account-security">
+        <div class="account-security-copy"><b>密码与会话</b><span>密码用于下次登录；退出会结束当前浏览器会话。</span></div>
         <div class="account-actions">
           <button class="btn" id="btnChangePw" type="button">修改管理密码</button>
           <button class="btn btn-danger" id="btnLogout" type="button">退出后台</button>
         </div>
       </div>
     </section>
-
-    <p class="foot">
-      点击<b>保存并应用</b>会把配置同步到 Cloudflare，所有设备上的游戏会自动获取新版本。
-      浏览器仍会在 <code>lucky_config_v1</code> 保留离线副本；后台登录在本次浏览器会话中保持有效。
-    </p>
   </div>
 
   <aside class="rail" data-manager-section="tickets">
@@ -1201,14 +1381,6 @@
   </section>
 </div>
 
-<div class="mobar" id="mobar">
-  <div class="mobar-rtp">
-    <span>实时赔付率</span>
-    <strong id="moRtp"><span id="moNum">—</span><em id="moBand"></em></strong>
-  </div>
-  <button class="btn btn-primary" id="moSave" disabled>保存并应用</button>
-</div>
-
 <div class="toast" id="toast"><i>✓</i><span id="toastMsg"></span></div>
 
 <script>
@@ -1224,6 +1396,7 @@
   var DRAFT_VERSION_KEY = "lucky_config_draft_base_v1";
   var CONFIG_API = "/api/config";
   var SESSION_API = "/api/manager/session";
+  var USERNAME_API = "/api/manager/username";
   var LOGIN_URL = "/manager-login.html?next=%2Fmanager.html";
   var CHANNEL_NAME = "lucky-config";
   var SCHEMA_VERSION = 1;
@@ -1259,6 +1432,20 @@
     };
   }
 
+  var LEGACY_DEFAULT_TOPUPS = [
+    { id: "starter", price: 4.9, coins: 5000 },
+    { id: "value", price: 9.9, coins: 12000 },
+    { id: "popular", price: 19.9, coins: 30000 },
+    { id: "mega", price: 49.9, coins: 80000 }
+  ];
+
+  function isLegacyDefaultTopups(topups) {
+    return topups.length === LEGACY_DEFAULT_TOPUPS.length && topups.every(function (item, index) {
+      var legacy = LEGACY_DEFAULT_TOPUPS[index];
+      return item.id === legacy.id && item.price === legacy.price && item.coins === legacy.coins;
+    });
+  }
+
   var cfg = null;      // working copy
   var saved = null;    // last-persisted snapshot, for dirty comparison
   var active = 0;      // index of the tier being edited
@@ -1280,6 +1467,13 @@
   var num = function (n) { return Number(n).toLocaleString("zh-CN"); };
   var pct = function (n, d) { return (n * 100).toFixed(d === undefined ? 1 : d) + "%"; };
   var mean = function (a) { return a.length ? a.reduce(function (s, v) { return s + v; }, 0) / a.length : 0; };
+  function applyManagerIdentity(username) {
+    var value = String(username || "Admin").trim() || "Admin";
+    $("managerIdentity").textContent = value;
+    $("managerIdentityAccount").textContent = value;
+    $("managerAvatar").textContent = value.slice(0, 1).toUpperCase();
+    if (document.activeElement !== $("managerUsernameNew")) $("managerUsernameNew").value = value;
+  }
   function compact(n) {
     if (!isFinite(n)) return "—";
     if (Math.abs(n) >= 100000000) return (n / 100000000).toFixed(2) + " 亿";
@@ -1303,7 +1497,7 @@
     },
     account: {
       title: "账户设置",
-      badge: "Admin"
+      badge: "账户安全"
     }
   };
 
@@ -1331,7 +1525,11 @@
     if (selectedButton && window.matchMedia && window.matchMedia("(max-width: 900px)").matches) {
       selectedButton.scrollIntoView({ behavior: opts.instant ? "auto" : "smooth", block: "nearest", inline: "center" });
     }
-    if (opts.focus) $("managerViewTitle").focus();
+    if (opts.focus) {
+      var title = $("managerViewTitle");
+      try { title.focus({ preventScroll: true }); } catch (e) { title.focus(); }
+      title.scrollIntoView({ behavior: opts.instant ? "auto" : "smooth", block: "start", inline: "nearest" });
+    }
   }
 
   document.querySelectorAll("[data-manager-target]").forEach(function (button) {
@@ -1434,7 +1632,7 @@
     player: {
       title: "玩家记录", sub: "查看当前浏览器里某个本地玩家的进度",
       body: [
-        { h: "能看到什么", p: "输入用户名后可查看本浏览器保存的余额、等级、票数、累计中奖、购票花费和最近记录。默认填写 <code>testplayer</code> 方便测试。" },
+        { h: "能看到什么", p: "输入用户名后可查看本浏览器保存的余额、等级、票数、累计中奖、购票花费和最近记录。可输入 <code>testplayer</code> 测试。" },
         { h: "数据在哪里", p: "玩家账号与进度目前只保存在同一浏览器的本地存储，所以这里只能读取<b>这台设备</b>玩过的玩家。不会读取或显示密码、哈希或安全字段。" },
         { warn: "这不是跨设备的正式玩家账本。若要查看所有真实玩家，必须把账号与交易记录迁移到受保护的云端数据库。" }
       ]
@@ -1501,20 +1699,6 @@
   });
   $("helpX").onclick = closeHelp;
 
-  // ---------- theme toggle (light / dark, remembered) ----------
-  (function () {
-    var KEY = "lucky_mgr_theme", root = document.documentElement;
-    function apply(t) {
-      root.setAttribute("data-theme", t);
-      try { localStorage.setItem(KEY, t); } catch (e) {}
-      var b = document.getElementById("themeToggle");
-      if (b) { b.textContent = t === "dark" ? "☀" : "☾"; b.setAttribute("aria-label", t === "dark" ? "切换到浅色模式" : "切换到深色模式"); }
-    }
-    var s = null; try { s = localStorage.getItem(KEY); } catch (e) {}
-    apply(s === "dark" ? "dark" : "light");
-    var tb = document.getElementById("themeToggle");
-    if (tb) tb.addEventListener("click", function () { apply(root.getAttribute("data-theme") === "dark" ? "light" : "dark"); });
-  })();
   $("helpBack").onmousedown = function (e) { if (e.target === $("helpBack")) closeHelp(); };
 
   var toastTimer = null;
@@ -1567,6 +1751,7 @@
         seenTopupIds[id] = true;
         out.topups.push({ id: id, price: Math.round(price * 100) / 100, coins: coins });
       });
+      if (isLegacyDefaultTopups(out.topups)) out.topups = clone(d.topups);
     }
     if (Array.isArray(raw.tiers) && raw.tiers.length) {
       out.tiers = raw.tiers.map(function (t, i) {
@@ -1967,6 +2152,37 @@
 
   var PLAYER_ACCOUNTS_KEY = "lucky_accounts_v1";
   var PLAYER_SAVE_PREFIX = "lucky_save_v1::";
+  function normalizePlayerUsername(value) {
+    var username = String(value || "").trim().toLowerCase();
+    if (!/^[a-z0-9_]{3,20}$/.test(username)) return null;
+    if (username === "__proto__" || username === "constructor" || username === "prototype") return null;
+    return username;
+  }
+  function refreshPlayerOptions() {
+    var names = new Set();
+    try {
+      var parsedAccounts = JSON.parse(localStorage.getItem(PLAYER_ACCOUNTS_KEY) || "{}");
+      if (parsedAccounts && typeof parsedAccounts === "object" && !Array.isArray(parsedAccounts)) {
+        Object.keys(parsedAccounts).forEach(function (key) {
+          var username = normalizePlayerUsername(key);
+          if (username) names.add(username);
+        });
+      }
+      for (var index = 0; index < localStorage.length; index += 1) {
+        var key = localStorage.key(index);
+        if (!key || key.indexOf(PLAYER_SAVE_PREFIX) !== 0) continue;
+        var savedUsername = normalizePlayerUsername(key.slice(PLAYER_SAVE_PREFIX.length));
+        if (savedUsername) names.add(savedUsername);
+      }
+    } catch (e) { /* local storage may be unavailable */ }
+    var options = $("playerNameOptions");
+    options.innerHTML = "";
+    Array.from(names).sort().forEach(function (username) {
+      var option = document.createElement("option");
+      option.value = username;
+      options.appendChild(option);
+    });
+  }
   function safePlayerNumber(value) {
     var number = Number(value);
     return isFinite(number) && number >= 0 ? number : 0;
@@ -1983,8 +2199,14 @@
     $("playerLog").appendChild(empty);
   }
   function renderPlayerReport() {
-    var username = String($("playerLookup").value || "").trim().toLowerCase();
-    if (!/^[a-z0-9_]{3,20}$/i.test(username) || username === "__proto__" || username === "constructor" || username === "prototype") {
+    var rawUsername = String($("playerLookup").value || "").trim();
+    if (!rawUsername) {
+      $("playerReportMeta").textContent = "搜索本浏览器保存的玩家记录。不会显示密码或安全资料。";
+      setPlayerReportEmpty("尚未读取玩家记录");
+      return;
+    }
+    var username = normalizePlayerUsername(rawUsername);
+    if (!username) {
       $("playerReportMeta").textContent = "请输入 3–20 位、只含字母数字或下划线的玩家用户名。";
       setPlayerReportEmpty("用户名格式无效");
       return;
@@ -2055,9 +2277,9 @@
     }
   }
 
-  $("btnPlayerLookup").onclick = renderPlayerReport;
-  $("playerLookup").onkeydown = function (event) {
-    if (event.key === "Enter") { event.preventDefault(); renderPlayerReport(); }
+  $("playerSearchForm").onsubmit = function (event) {
+    event.preventDefault();
+    renderPlayerReport();
   };
 
   function renderGauge() {
@@ -2074,12 +2296,6 @@
     bandEl.style.background = "color-mix(in srgb," + b.color + " 16%, transparent)";
     bandEl.style.color = b.color;
     $("rtpPin").style.left = Math.max(0, Math.min(100, (a.rtp / 1.5) * 100)) + "%";
-
-    // mirror into the sticky mobile bar so the consequence is never off-screen
-    $("moNum").textContent = isFinite(a.rtp) ? (a.rtp * 100).toFixed(1) + "%" : "—";
-    $("moRtp").style.color = b.color;
-    $("moBand").textContent = b.label.split(" · ")[0];
-    $("moBand").style.color = b.color;
 
     $("bdMatch").textContent = a.matches.toFixed(3) + " 格";
     $("bdPrize").textContent = tokenText(a.prize);
@@ -2180,10 +2396,10 @@
     if (d && remoteReady && draftBaseVersion === null && !cloudConflict) draftBaseVersion = remoteVersion;
     var canPublish = d || cloudNeedsInit;
     $("dirty").className = "dirty" + (d ? " on" : "");
-    $("btnSave").disabled = !canPublish || syncBusy || !remoteReady;
-    $("moSave").disabled = !canPublish || syncBusy || !remoteReady;
-    $("btnSave").textContent = cloudConflict ? "解决云端冲突" : "保存并应用";
-    $("moSave").textContent = cloudConflict ? "解决冲突" : "保存并应用";
+    document.querySelectorAll("[data-save-config]").forEach(function (button) {
+      button.disabled = !canPublish || syncBusy || !remoteReady;
+      button.textContent = syncBusy ? "正在发布…" : (cloudConflict ? "解决云端冲突" : "保存并应用");
+    });
   }
   function stripMeta(c) { var x = clone(c); delete x.updatedAt; return x; }
 
@@ -2313,7 +2529,8 @@
     }
   }
 
-  $("btnSave").onclick = async function () {
+  async function publishConfig() {
+    if (syncBusy) return;
     if (cloudConflict) {
       if (window.confirm("云端已有更新，本机草稿不能直接覆盖。是否放弃本机草稿并载入最新云端配置？")) {
         try { localStorage.removeItem(DRAFT_KEY); localStorage.removeItem(DRAFT_VERSION_KEY); } catch (e) {}
@@ -2322,18 +2539,18 @@
       return;
     }
     var sum = cfg.odds.m0 + cfg.odds.m1 + cfg.odds.m2 + cfg.odds.m3;
-    if (sum <= 0) { toast("中奖概率不能全为 0", "err"); return; }
+    if (sum <= 0) { setManagerView("tickets", { focus: true }); toast("中奖概率不能全为 0", "err"); return; }
     if ([cfg.odds.m0, cfg.odds.m1, cfg.odds.m2, cfg.odds.m3].some(function (v) { return v < 0 || v > 1; })) {
-      toast("每项中奖概率必须在 0 – 100% 之间", "err"); return;
+      setManagerView("tickets", { focus: true }); toast("每项中奖概率必须在 0 – 100% 之间", "err"); return;
     }
     var bad = cfg.tiers.filter(function (t) { return !t.prizePool.length || !t.multipliers.length || t.cost <= 0; });
-    if (bad.length) { toast("有票种的奖金池 / 倍数池为空或票价无效", "err"); return; }
+    if (bad.length) { setManagerView("tickets", { focus: true }); toast("有票种的奖金池 / 倍数池为空或票价无效", "err"); return; }
     if (!cfg.economy || !Number.isSafeInteger(cfg.economy.coinsPerToken) || cfg.economy.coinsPerToken < 1 || cfg.economy.coinsPerToken > 1000000 ||
         !isFinite(cfg.economy.myrPerToken) || cfg.economy.myrPerToken < 0.01 || cfg.economy.myrPerToken > 1000000 ||
         Math.abs(cfg.economy.myrPerToken * 100 - Math.round(cfg.economy.myrPerToken * 100)) > 0.00000001) {
-      toast("代币换算设置无效", "err"); return;
+      setManagerView("topups", { focus: true }); toast("代币换算设置无效", "err"); return;
     }
-    if (!Array.isArray(cfg.topups) || cfg.topups.length > TOPUP_MAX) { toast("充值套餐最多只能有 " + TOPUP_MAX + " 个", "err"); return; }
+    if (!Array.isArray(cfg.topups) || cfg.topups.length > TOPUP_MAX) { setManagerView("topups", { focus: true }); toast("充值套餐最多只能有 " + TOPUP_MAX + " 个", "err"); return; }
     var seenTopupIds = {};
     var invalidTopup = cfg.topups.some(function (item) {
       var id = String(item.id || "").toLowerCase();
@@ -2343,7 +2560,7 @@
       seenTopupIds[id] = true;
       return invalid;
     });
-    if (invalidTopup) { toast("充值套餐含有无效或重复的价格 / 金币数据", "err"); return; }
+    if (invalidTopup) { setManagerView("topups", { focus: true }); toast("充值套餐含有无效或重复的价格 / 金币数据", "err"); return; }
     cfg.updatedAt = Date.now();
     var expectedVersion = draftBaseVersion === null ? remoteVersion : draftBaseVersion;
     try {
@@ -2429,9 +2646,13 @@
       renderDirty();
       if (reconcileAfterSave) window.setTimeout(function () { loadRemote(true); }, 0);
     }
-  };
+  }
 
-  $("moSave").onclick = function () { $("btnSave").click(); };
+  document.querySelectorAll("[data-save-config]").forEach(function (button) {
+    button.addEventListener("click", function () {
+      void publishConfig();
+    });
+  });
 
   $("btnLogout").onclick = async function () {
     if (syncBusy) { toast("请等待当前发布完成后再退出", "err"); return; }
@@ -2508,6 +2729,55 @@
       pwError("网络连接失败，请稍后重试");
     } finally {
       button.disabled = false; button.textContent = "保存新密码";
+    }
+  };
+
+  $("managerUsernameForm").onsubmit = async function (event) {
+    event.preventDefault();
+    var username = $("managerUsernameNew").value.trim();
+    var currentPassword = $("managerUsernamePassword").value;
+    var message = $("usernameError");
+    message.className = "username-error";
+    message.textContent = "";
+    if (!/^[A-Za-z][A-Za-z0-9_]{2,31}$/.test(username)) {
+      message.textContent = "用户名须为 3–32 位，以字母开头，只能使用字母、数字或下划线。";
+      return;
+    }
+    if (!currentPassword) {
+      message.textContent = "请输入当前密码确认修改。";
+      $("managerUsernamePassword").focus();
+      return;
+    }
+
+    var button = $("btnChangeUsername");
+    button.disabled = true;
+    button.textContent = "保存中…";
+    try {
+      var response = await fetch(USERNAME_API, {
+        method: "POST",
+        credentials: "same-origin",
+        cache: "no-store",
+        headers: { "accept": "application/json", "content-type": "application/json" },
+        body: JSON.stringify({ currentPassword: currentPassword, newUsername: username })
+      });
+      if (response.ok) {
+        var payload = await response.json();
+        applyManagerIdentity(payload.username);
+        $("managerUsernamePassword").value = "";
+        message.className = "username-error ok";
+        message.textContent = "用户名已更新";
+        toast("管理员用户名已更新，下次登录请使用新用户名");
+        return;
+      }
+      if (response.status === 401) message.textContent = "当前密码不正确，或登录会话已过期。";
+      else if (response.status === 422) message.textContent = "用户名无效，或与当前用户名相同。";
+      else if (response.status === 503) message.textContent = "云端账户存储暂时不可用。";
+      else message.textContent = "无法更新用户名，请稍后重试。";
+    } catch (error) {
+      message.textContent = "网络连接失败，请稍后重试。";
+    } finally {
+      button.disabled = false;
+      button.textContent = "保存用户名";
     }
   };
 
@@ -2638,7 +2908,10 @@
     if (e.key === "Escape" && $("helpBack").className.indexOf("on") >= 0) { closeHelp(); return; }
     if ((e.metaKey || e.ctrlKey) && e.key === "s") {
       e.preventDefault();
-      if (!$("btnSave").disabled) $("btnSave").click();
+      var view = document.body.getAttribute("data-manager-view");
+      if (view !== "tickets" && view !== "topups") return;
+      var saveButton = document.querySelector('[data-save-config="' + view + '"]');
+      if (saveButton && !saveButton.disabled) void publishConfig();
     }
   });
 
@@ -2651,10 +2924,10 @@
     renderFields();
     renderOdds();
     renderTopups();
-    renderPlayerReport();
     renderGauge();
     renderOverview();
     renderDirty();
+    if (normalizePlayerUsername($("playerLookup").value)) renderPlayerReport();
   }
 
   var managerStarted = false;
@@ -2689,8 +2962,7 @@
       try {
         var sessionPayload = await response.json();
         if (sessionPayload && sessionPayload.username) {
-          $("managerIdentity").textContent = sessionPayload.username;
-          $("managerIdentityAccount").textContent = sessionPayload.username;
+          applyManagerIdentity(sessionPayload.username);
         }
       } catch (ignore) {}
       return true;
@@ -2707,6 +2979,7 @@
     document.body.classList.add("auth-checking");
     if (!await ensureManagerSession(true)) return;
     load();
+    refreshPlayerOptions();
     renderAll();
     managerStarted = true;
     document.body.classList.remove("auth-checking");
@@ -2722,8 +2995,9 @@
     });
   });
   window.addEventListener("storage", function (event) {
-    var username = String($("playerLookup").value || "").trim().toLowerCase();
-    if (event.key === PLAYER_ACCOUNTS_KEY || event.key === PLAYER_SAVE_PREFIX + username) renderPlayerReport();
+    var username = normalizePlayerUsername($("playerLookup").value);
+    if (event.key === PLAYER_ACCOUNTS_KEY || (event.key && event.key.indexOf(PLAYER_SAVE_PREFIX) === 0)) refreshPlayerOptions();
+    if (username && (event.key === PLAYER_ACCOUNTS_KEY || event.key === PLAYER_SAVE_PREFIX + username)) renderPlayerReport();
   });
   void startManager();
 })();

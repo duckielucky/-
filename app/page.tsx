@@ -107,6 +107,12 @@ const DEFAULT_TOPUPS: TopupPackage[] = [
   { id: "popular", price: 20, coins: 1000 },
   { id: "mega", price: 50, coins: 2500 },
 ];
+const LEGACY_DEFAULT_TOPUPS: TopupPackage[] = [
+  { id: "starter", price: 4.9, coins: 5000 },
+  { id: "value", price: 9.9, coins: 12000 },
+  { id: "popular", price: 19.9, coins: 30000 },
+  { id: "mega", price: 49.9, coins: 80000 },
+];
 const DEFAULT_ECONOMY: EconomyConfig = { coinsPerToken: 50, myrPerToken: 1 };
 const DEFAULT_CONFIG: GameConfig = { types: TICKET_TYPES, odds: DEFAULT_ODDS, multiplierMinLevel: 3, topups: DEFAULT_TOPUPS, economy: DEFAULT_ECONOMY };
 
@@ -153,7 +159,7 @@ function normaliseConfig(value: unknown): GameConfig {
 
     const minLevel = Number(parsed.multiplierMinLevel);
     const seenTopups = new Set<string>();
-    const topups = Array.isArray(parsed.topups)
+    const parsedTopups = Array.isArray(parsed.topups)
       ? parsed.topups.reduce<TopupPackage[]>((packages, entry) => {
           if (!entry || typeof entry !== "object" || packages.length >= 20) return packages;
           const raw = entry as Partial<TopupPackage>;
@@ -168,6 +174,12 @@ function normaliseConfig(value: unknown): GameConfig {
           return packages;
         }, [])
       : DEFAULT_TOPUPS;
+    const isLegacyDefaultTopups = parsedTopups.length === LEGACY_DEFAULT_TOPUPS.length
+      && parsedTopups.every((item, index) => {
+        const legacy = LEGACY_DEFAULT_TOPUPS[index];
+        return item.id === legacy.id && item.price === legacy.price && item.coins === legacy.coins;
+      });
+    const topups = isLegacyDefaultTopups ? DEFAULT_TOPUPS : parsedTopups;
     const rawCoinsPerToken = Number(parsed.economy?.coinsPerToken);
     const rawMyrPerToken = Number(parsed.economy?.myrPerToken);
     const economy = {

@@ -157,12 +157,12 @@
       <div class="lock-mark" aria-hidden="true">⌁</div>
       <div class="session-note"><i></i><span>安全的浏览器会话</span></div>
       <h1 id="loginTitle">登录运营后台</h1>
-      <p class="intro">使用 Admin 用户名与管理密码登录。本次浏览器会话将保持登录，无需在每次保存时重复输入。</p>
+      <p class="intro">使用管理员用户名与管理密码登录。本次浏览器会话将保持登录，无需在每次保存时重复输入。</p>
 
       <form id="loginForm" novalidate>
         <div class="field">
           <label for="username">用户名</label>
-          <input id="username" name="username" type="text" value="Admin" autocomplete="username" autocapitalize="none" spellcheck="false" required disabled />
+          <input id="username" name="username" type="text" placeholder="管理员用户名" autocomplete="username" autocapitalize="none" spellcheck="false" required disabled />
         </div>
         <div class="field">
           <label for="password">管理密码</label>
@@ -223,7 +223,7 @@
     reveal.disabled = !enabled;
     submit.disabled = !enabled;
     checking.setAttribute("data-state", enabled ? "idle" : "checking");
-    if (enabled) window.setTimeout(function () { password.focus(); }, 0);
+    if (enabled) window.setTimeout(function () { (username.value.trim() ? password : username).focus(); }, 0);
   }
 
   function showError(message) {
@@ -306,7 +306,7 @@
       }
       password.select();
       showError(response.status === 401
-        ? "无法登录，请检查管理密码后重试。"
+        ? "无法登录，请检查用户名或管理密码后重试。"
         : "暂时无法登录，请稍后重试。");
     } catch (e) {
       showError("无法连接登录服务，请检查网络后重试。");

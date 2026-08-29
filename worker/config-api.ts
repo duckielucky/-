@@ -59,11 +59,26 @@ type OperatorConfig = {
 const DEFAULT_ECONOMY: EconomyConfig = { coinsPerToken: 50, myrPerToken: 1 };
 
 const DEFAULT_TOPUPS: TopupPackage[] = [
+  { id: "starter", price: 5, coins: 250 },
+  { id: "value", price: 10, coins: 500 },
+  { id: "popular", price: 20, coins: 1000 },
+  { id: "mega", price: 50, coins: 2500 },
+];
+const LEGACY_DEFAULT_TOPUPS: TopupPackage[] = [
   { id: "starter", price: 4.9, coins: 5000 },
   { id: "value", price: 9.9, coins: 12000 },
   { id: "popular", price: 19.9, coins: 30000 },
   { id: "mega", price: 49.9, coins: 80000 },
 ];
+
+function migrateLegacyTopups(packages: TopupPackage[]): TopupPackage[] {
+  const isLegacyDefault = packages.length === LEGACY_DEFAULT_TOPUPS.length
+    && packages.every((item, index) => {
+      const legacy = LEGACY_DEFAULT_TOPUPS[index];
+      return item.id === legacy.id && item.price === legacy.price && item.coins === legacy.coins;
+    });
+  return (isLegacyDefault ? DEFAULT_TOPUPS : packages).map((item) => ({ ...item }));
+}
 
 const CREATE_TABLE = `
   CREATE TABLE IF NOT EXISTS game_config (
@@ -121,10 +136,10 @@ function readNumberList(value: unknown, label: string, min: number, max: number,
 }
 
 function validateTopups(value: unknown, fallback: TopupPackage[] = DEFAULT_TOPUPS): TopupPackage[] {
-  if (value === undefined) return fallback.map((item) => ({ ...item }));
+  if (value === undefined) return migrateLegacyTopups(fallback);
   if (!Array.isArray(value) || value.length > 20) throw new Error("topups must contain 0-20 packages");
   const seenIds = new Set<string>();
-  return value.map((rawPackage, index): TopupPackage => {
+  const packages = value.map((rawPackage, index): TopupPackage => {
     if (!isRecord(rawPackage)) throw new Error(`topups[${index}] must be an object`);
     const id = readString(rawPackage.id, `topups[${index}].id`, 40).toLowerCase();
     if (!/^[a-z0-9_-]+$/i.test(id)) throw new Error(`topups[${index}].id may only use letters, numbers, _ and -`);
@@ -141,6 +156,7 @@ function validateTopups(value: unknown, fallback: TopupPackage[] = DEFAULT_TOPUP
       coins: readInteger(rawPackage.coins, `topups[${index}].coins`, 1, 1_000_000_000),
     };
   });
+  return migrateLegacyTopups(packages);
 }
 
 function validateEconomy(value: unknown, fallback: EconomyConfig = DEFAULT_ECONOMY): EconomyConfig {
@@ -243,10 +259,14 @@ async function getConfig(db: D1Database, request: Request): Promise<Response> {
     return error("The stored game configuration is damaged", 500);
   }
   if (isRecord(config)) {
-    const migrated = { ...config };
-    if (migrated.topups === undefined) migrated.topups = DEFAULT_TOPUPS;
-    if (migrated.economy === undefined) migrated.economy = DEFAULT_ECONOMY;
-    config = migrated;
+    try {
+      const migrated = { ...config };
+      migrated.topups = validateTopups(migrated.topups);
+      if (migrated.economy === undefined) migrated.economy = DEFAULT_ECONOMY;
+      config = migrated;
+    } catch {
+      return error("The stored game configuration is damaged", 500);
+    }
   }
   const etag = `"lucky-config-v${row.version}"`;
   if (request.headers.get("if-none-match") === etag) {

@@ -13,6 +13,12 @@ const NATURAL_DEFAULT_TOPUPS = [
   { id: "popular", price: 20, coins: 1000 },
   { id: "mega", price: 50, coins: 2500 },
 ];
+const LEGACY_DEFAULT_TOPUPS = [
+  { id: "starter", price: 4.9, coins: 5000 },
+  { id: "value", price: 9.9, coins: 12000 },
+  { id: "popular", price: 19.9, coins: 30000 },
+  { id: "mega", price: 49.9, coins: 80000 },
+];
 
 async function render() {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
@@ -25,17 +31,37 @@ async function render() {
   );
 }
 
-function createConfigDb() {
-  let row = null;
+function createConfigDb(initialConfig = null) {
+  let row = initialConfig
+    ? { configJson: JSON.stringify(initialConfig), version: 1, updatedAt: 1 }
+    : null;
   let managerSecret = null;
+  let managerAccount = null;
+  const managerLoginThrottle = new Map();
   return {
+    managerLoginThrottleRows() {
+      return [...managerLoginThrottle.entries()].map(([key, value]) => ({ key, ...value }));
+    },
+    ageManagerLoginThrottle(milliseconds) {
+      for (const value of managerLoginThrottle.values()) {
+        value.windowStartedAt -= milliseconds;
+        value.updatedAt -= milliseconds;
+      }
+    },
     prepare(sql) {
       let values = [];
       const statement = {
         bind(...next) { values = next; return statement; },
         async first() {
           if (/SELECT config_json/i.test(sql) && row) return { configJson: row.configJson, version: row.version, updatedAt: row.updatedAt };
-          if (/SELECT hash, salt, algorithm FROM manager_secret/i.test(sql) && managerSecret) return { ...managerSecret };
+          if (/SELECT hash, salt, algorithm[\s\S]*FROM manager_secret/i.test(sql) && managerSecret) return { ...managerSecret };
+          if (/SELECT username, username_normalized AS usernameNormalized[\s\S]*FROM manager_account/i.test(sql) && managerAccount) {
+            return { ...managerAccount };
+          }
+          if (/SELECT failed_attempts AS failedAttempts, window_started_at AS windowStartedAt[\s\S]*FROM manager_login_throttle/i.test(sql)) {
+            const throttle = managerLoginThrottle.get(values[0]);
+            return throttle ? { ...throttle } : null;
+          }
           return null;
         },
         async run() {
@@ -52,6 +78,34 @@ function createConfigDb() {
           }
           if (/INSERT INTO manager_secret/i.test(sql)) {
             managerSecret = { hash: values[1], salt: values[2], algorithm: values[3], updatedAt: values[4] };
+            return { meta: { changes: 1 } };
+          }
+          if (/INSERT INTO manager_account/i.test(sql)) {
+            managerAccount = { username: values[1], usernameNormalized: values[2], updatedAt: values[3] };
+            return { meta: { changes: 1 } };
+          }
+          if (/DELETE FROM manager_login_throttle WHERE updated_at/i.test(sql)) {
+            let changes = 0;
+            for (const [key, value] of managerLoginThrottle) {
+              if (value.updatedAt <= values[0]) {
+                managerLoginThrottle.delete(key);
+                changes += 1;
+              }
+            }
+            return { meta: { changes } };
+          }
+          if (/DELETE FROM manager_login_throttle WHERE key/i.test(sql)) {
+            const changes = managerLoginThrottle.delete(values[0]) ? 1 : 0;
+            return { meta: { changes } };
+          }
+          if (/INSERT INTO manager_login_throttle/i.test(sql)) {
+            const [key, now, staleBefore] = values;
+            const current = managerLoginThrottle.get(key);
+            if (!current || current.windowStartedAt <= staleBefore) {
+              managerLoginThrottle.set(key, { failedAttempts: 1, windowStartedAt: now, updatedAt: now });
+            } else {
+              managerLoginThrottle.set(key, { ...current, failedAttempts: current.failedAttempts + 1, updatedAt: now });
+            }
             return { meta: { changes: 1 } };
           }
           throw new Error(`Unexpected SQL: ${sql}`);
@@ -83,10 +137,10 @@ function sameOriginHeaders(extra = {}) {
   return { origin: API_ORIGIN, "sec-fetch-site": "same-origin", ...extra };
 }
 
-async function managerLogin(db, password = MANAGER_PASSWORD, username = MANAGER_USERNAME) {
+async function managerLogin(db, password = MANAGER_PASSWORD, username = MANAGER_USERNAME, connectingIp = "203.0.113.10") {
   return apiFetch(db, "/api/manager/session", {
     method: "POST",
-    headers: sameOriginHeaders({ "content-type": "application/json" }),
+    headers: sameOriginHeaders({ "content-type": "application/json", "cf-connecting-ip": connectingIp }),
     body: JSON.stringify({ username, password }),
   });
 }
@@ -133,7 +187,7 @@ test("serves game bundles asset-first while keeping manager routes protected", a
 });
 
 test("ships the game systems and installable assets", async () => {
-  const [page, layout, styles, accountStyles, login, profile, manager, managerLoginPage, manifest, serviceWorker, packageJson] = await Promise.all([
+  const [page, layout, styles, accountStyles, login, profile, manager, managerLoginPage, manifest, serviceWorker, packageJson, configApi] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
@@ -145,6 +199,7 @@ test("ships the game systems and installable assets", async () => {
     readFile(new URL("../public/manifest.webmanifest", import.meta.url), "utf8"),
     readFile(new URL("../public/sw.js", import.meta.url), "utf8"),
     readFile(new URL("../package.json", import.meta.url), "utf8"),
+    readFile(new URL("../worker/config-api.ts", import.meta.url), "utf8"),
   ]);
   assert.match(page, /const TICKET_TYPES/);
   assert.match(page, /destination-out/);
@@ -164,6 +219,7 @@ test("ships the game systems and installable assets", async () => {
   for (const topup of NATURAL_DEFAULT_TOPUPS) {
     assert.match(page, new RegExp(`id: "${topup.id}", price: ${topup.price}, coins: ${topup.coins}`));
     assert.match(manager, new RegExp(`id: "${topup.id}", price: ${topup.price}, coins: ${topup.coins}`));
+    assert.match(configApi, new RegExp(`id: "${topup.id}", price: ${topup.price}, coins: ${topup.coins}`));
   }
   assert.match(page, /setAttribute\("inert", ""\)/);
   assert.match(page, /topupConfirmRef/);
@@ -186,10 +242,12 @@ test("ships the game systems and installable assets", async () => {
   assert.match(manager, /id="topupRows"/);
   assert.match(manager, /id="fMyrPerToken"/);
   assert.match(manager, /id="fCoinsPerToken"/);
-  assert.match(manager, /id="playerLookup"[^>]*value="testplayer"/);
+  assert.match(manager, /id="playerLookup"[^>]*type="search"[^>]*list="playerNameOptions"/);
   assert.match(manager, /id="playerWon"/);
   assert.match(manager, /id="playerSpent"/);
   assert.match(manager, /id="playerLog"/);
+  assert.match(manager, /id="playerSearchForm"[^>]*role="search"/);
+  assert.match(manager, /id="playerNameOptions"/);
   assert.match(manager, /仅此浏览器/);
   assert.match(manager, /data-manager-target="tickets"/);
   assert.match(manager, /data-manager-target="topups"/);
@@ -203,8 +261,26 @@ test("ships the game systems and installable assets", async () => {
   assert.match(manager, /data-manager-section="players"/);
   assert.match(manager, /data-manager-section="account"/);
   assert.match(manager, /id="managerIdentityAccount"/);
+  assert.match(manager, /id="managerAvatar"/);
+  assert.match(manager, /id="managerUsernameForm"/);
+  assert.match(manager, /id="managerUsernameNew"[^>]*minlength="3"[^>]*maxlength="32"[^>]*autocomplete="username"/);
+  assert.match(manager, /id="managerUsernamePassword"[^>]*type="password"[^>]*autocomplete="current-password"/);
+  assert.match(manager, /id="btnChangeUsername"[^>]*type="submit"/);
+  assert.match(manager, /id="usernameError"[^>]*role="alert"/);
+  assert.match(manager, /\/api\/manager\/username/);
+  assert.equal((manager.match(/data-save-config="(?:tickets|topups)"/g) ?? []).length, 2);
+  assert.doesNotMatch(manager, /id="(?:btnSave|moSave)"/);
+  assert.match(manager, /async function publishConfig\(/);
+  assert.match(manager, /--bg:#09040f/);
+  assert.match(manager, /--cyan:#2ce9d3/);
+  assert.match(manager, /--gold:#ffd76e/);
   assert.match(manager, /function setManagerView\(/);
   assert.match(manager, /@media \(max-width:900px\)[\s\S]*?\.manager-nav\{/);
+  assert.match(manager, /@media \(max-width:900px\)[\s\S]*?\.topbar\{[\s\S]*?height:58px/);
+  assert.match(manager, /\.manager-view-head h2\{[^}]*scroll-margin-top:138px/);
+  assert.match(manager, /title\.focus\(\{ preventScroll: true \}\)/);
+  assert.equal((manager.match(/保存所有未发布更改/g) ?? []).length, 2);
+  assert.match(manager, /if \(normalizePlayerUsername\(\$\("playerLookup"\)\.value\)\) renderPlayerReport\(\)/);
   assert.match(manager, /PLAYER_SAVE_PREFIX \+ username/);
   assert.match(manager, /detail\.textContent = labels\[entry\.k\]/);
   assert.match(manager, /删除套餐/);
@@ -216,7 +292,10 @@ test("ships the game systems and installable assets", async () => {
   assert.match(manager, /method:\s*"DELETE"/);
   assert.match(manager, /credentials:\s*"same-origin"/);
   assert.match(managerLoginPage, /id="loginForm"/);
-  assert.match(managerLoginPage, /id="username"[^>]*value="Admin"[^>]*autocomplete="username"/);
+  assert.match(managerLoginPage, /id="username"[^>]*placeholder="管理员用户名"[^>]*autocomplete="username"/);
+  assert.doesNotMatch(managerLoginPage, /id="username"[^>]*value="Admin"/);
+  assert.match(managerLoginPage, /使用管理员用户名与管理密码登录/);
+  assert.match(managerLoginPage, /请检查用户名或管理密码后重试/);
   assert.match(managerLoginPage, /\/api\/manager\/session/);
   assert.match(managerLoginPage, /JSON\.stringify\(\{\s*username:\s*username\.value\.trim\(\),\s*password:\s*password\.value\s*\}\)/);
   assert.match(managerLoginPage, /credentials:\s*"same-origin"/);
@@ -328,6 +407,46 @@ test("creates, checks, and expires an HttpOnly signed manager session", async ()
   assert.match(logoutCookie, /; SameSite=Strict/i);
 });
 
+test("throttles manager login failures by opaque IP and normalized-username key", async () => {
+  const db = createConfigDb();
+  const connectingIp = "198.51.100.42";
+
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const username = attempt % 2 === 0 ? "Admin" : "aDmIn";
+    const failed = await managerLogin(db, `wrong-password-${attempt}`, username, connectingIp);
+    assert.equal(failed.status, 401, `failure ${attempt + 1}`);
+    assert.equal(failed.headers.get("retry-after"), null);
+  }
+
+  const rows = db.managerLoginThrottleRows();
+  assert.equal(rows.length, 1, "username casing must share one throttle bucket");
+  assert.equal(rows[0].failedAttempts, 5);
+  assert.match(rows[0].key, /^[A-Za-z0-9_-]{43}$/);
+  assert.notEqual(rows[0].key, connectingIp, "the persisted key must not expose the IP address");
+  assert.equal(Object.hasOwn(rows[0], "username"), false);
+
+  const blocked = await managerLogin(db, MANAGER_PASSWORD, MANAGER_USERNAME, connectingIp);
+  assert.equal(blocked.status, 429);
+  assert.equal(blocked.headers.get("set-cookie"), null);
+  const retryAfter = Number(blocked.headers.get("retry-after"));
+  assert.equal(Number.isSafeInteger(retryAfter) && retryAfter >= 1 && retryAfter <= 900, true);
+
+  const otherIp = await managerLogin(db, MANAGER_PASSWORD, MANAGER_USERNAME, "198.51.100.43");
+  assert.equal(otherIp.status, 200, "a different connecting IP must use a different bucket");
+
+  db.ageManagerLoginThrottle(15 * 60 * 1000 + 1);
+  const afterWindow = await managerLogin(db, MANAGER_PASSWORD, MANAGER_USERNAME, connectingIp);
+  assert.equal(afterWindow.status, 200);
+  assert.equal(db.managerLoginThrottleRows().length, 0, "a successful login must clear its failure bucket");
+
+  const failedAgain = await managerLogin(db, "wrong-after-success", MANAGER_USERNAME, connectingIp);
+  assert.equal(failedAgain.status, 401);
+  assert.equal(db.managerLoginThrottleRows()[0].failedAttempts, 1);
+  const reset = await managerLogin(db, MANAGER_PASSWORD, MANAGER_USERNAME, connectingIp);
+  assert.equal(reset.status, 200);
+  assert.equal(db.managerLoginThrottleRows().length, 0);
+});
+
 test("keeps a strong signing secret separate from the manager password", async () => {
   const db = createConfigDb();
   const shortSigningSecret = await apiFetch(db, "/api/manager/session", {
@@ -386,6 +505,12 @@ test("changes the manager password in D1 without exposing or reviving credential
   });
   assert.equal(changed.status, 200);
   assert.deepEqual(await changed.json(), { ok: true });
+  const refreshedPasswordCookie = readSessionCookie(changed).cookie;
+
+  const stalePasswordSession = await apiFetch(db, "/api/manager/session", { headers: { cookie } });
+  assert.equal(stalePasswordSession.status, 401);
+  const refreshedPasswordSession = await apiFetch(db, "/api/manager/session", { headers: { cookie: refreshedPasswordCookie } });
+  assert.equal(refreshedPasswordSession.status, 200);
 
   const oldPassword = await managerLogin(db, MANAGER_PASSWORD);
   assert.equal(oldPassword.status, 401);
@@ -396,9 +521,9 @@ test("changes the manager password in D1 without exposing or reviving credential
 
   const failingDb = { prepare() { throw new Error("D1 unavailable"); } };
   const oldPasswordDuringOutage = await managerLogin(failingDb, MANAGER_PASSWORD);
-  assert.equal(oldPasswordDuringOutage.status, 401);
+  assert.equal(oldPasswordDuringOutage.status, 503);
   const recoveryDuringOutage = await managerLogin(failingDb, MANAGER_SESSION_SECRET);
-  assert.equal(recoveryDuringOutage.status, 200);
+  assert.equal(recoveryDuringOutage.status, 503);
 
   const crossOrigin = await apiFetch(db, "/api/manager/password", {
     method: "POST",
@@ -406,6 +531,112 @@ test("changes the manager password in D1 without exposing or reviving credential
     body: JSON.stringify({ currentPassword: "ChangedPass123", newPassword: "AnotherPass123" }),
   });
   assert.equal(crossOrigin.status, 403);
+});
+
+test("changes and persists the manager username behind the existing authenticated session", async () => {
+  const db = createConfigDb();
+  const loggedIn = await managerLogin(db);
+  assert.equal(loggedIn.status, 200);
+  const { cookie } = readSessionCookie(loggedIn);
+
+  const wrongMethod = await apiFetch(db, "/api/manager/username", {
+    method: "GET",
+    headers: { cookie },
+  });
+  assert.equal(wrongMethod.status, 405);
+  assert.equal(wrongMethod.headers.get("allow"), "POST");
+
+  const unauthorized = await apiFetch(db, "/api/manager/username", {
+    method: "POST",
+    headers: sameOriginHeaders({ "content-type": "application/json" }),
+    body: JSON.stringify({ currentPassword: MANAGER_PASSWORD, newUsername: "Lucky_Admin2" }),
+  });
+  assert.equal(unauthorized.status, 401);
+
+  const wrongContentType = await apiFetch(db, "/api/manager/username", {
+    method: "POST",
+    headers: sameOriginHeaders({ cookie, "content-type": "text/plain" }),
+    body: JSON.stringify({ currentPassword: MANAGER_PASSWORD, newUsername: "Lucky_Admin2" }),
+  });
+  assert.equal(wrongContentType.status, 400);
+
+  const malformed = await apiFetch(db, "/api/manager/username", {
+    method: "POST",
+    headers: sameOriginHeaders({ cookie, "content-type": "application/json" }),
+    body: JSON.stringify({ currentPassword: MANAGER_PASSWORD }),
+  });
+  assert.equal(malformed.status, 400);
+
+  const wrongCurrentPassword = await apiFetch(db, "/api/manager/username", {
+    method: "POST",
+    headers: sameOriginHeaders({ cookie, "content-type": "application/json" }),
+    body: JSON.stringify({ currentPassword: "wrong-password", newUsername: "Lucky_Admin2" }),
+  });
+  assert.equal(wrongCurrentPassword.status, 401);
+
+  const invalidUsernames = [
+    "ab",
+    "a".repeat(33),
+    "2Admin",
+    "Admin User",
+    "Admin-User",
+    "管理员",
+  ];
+  for (const newUsername of invalidUsernames) {
+    const response = await apiFetch(db, "/api/manager/username", {
+      method: "POST",
+      headers: sameOriginHeaders({ cookie, "content-type": "application/json" }),
+      body: JSON.stringify({ currentPassword: MANAGER_PASSWORD, newUsername }),
+    });
+    assert.equal(response.status, 422, newUsername);
+  }
+
+  const unchanged = await apiFetch(db, "/api/manager/username", {
+    method: "POST",
+    headers: sameOriginHeaders({ cookie, "content-type": "application/json" }),
+    body: JSON.stringify({ currentPassword: MANAGER_PASSWORD, newUsername: MANAGER_USERNAME }),
+  });
+  assert.equal(unchanged.status, 422);
+
+  const caseOnlyChange = await apiFetch(db, "/api/manager/username", {
+    method: "POST",
+    headers: sameOriginHeaders({ cookie, "content-type": "application/json" }),
+    body: JSON.stringify({ currentPassword: MANAGER_PASSWORD, newUsername: "admin" }),
+  });
+  assert.equal(caseOnlyChange.status, 422);
+
+  const crossOrigin = await apiFetch(db, "/api/manager/username", {
+    method: "POST",
+    headers: { cookie, "content-type": "application/json", origin: "https://example.com", "sec-fetch-site": "cross-site" },
+    body: JSON.stringify({ currentPassword: MANAGER_PASSWORD, newUsername: "Lucky_Admin2" }),
+  });
+  assert.equal(crossOrigin.status, 403);
+
+  const changed = await apiFetch(db, "/api/manager/username", {
+    method: "POST",
+    headers: sameOriginHeaders({ cookie, "content-type": "application/json" }),
+    body: JSON.stringify({ currentPassword: MANAGER_PASSWORD, newUsername: "Lucky_Admin2" }),
+  });
+  assert.equal(changed.status, 200);
+  assert.deepEqual(await changed.json(), { ok: true, username: "Lucky_Admin2" });
+  const refreshedUsernameCookie = readSessionCookie(changed).cookie;
+
+  const staleUsernameSession = await apiFetch(db, "/api/manager/session", { headers: { cookie } });
+  assert.equal(staleUsernameSession.status, 401);
+  const refreshedUsernameSession = await apiFetch(db, "/api/manager/session", { headers: { cookie: refreshedUsernameCookie } });
+  assert.equal(refreshedUsernameSession.status, 200);
+  assert.equal((await refreshedUsernameSession.json()).username, "Lucky_Admin2");
+
+  const oldUsername = await managerLogin(db, MANAGER_PASSWORD, MANAGER_USERNAME);
+  assert.equal(oldUsername.status, 401);
+  assert.equal(oldUsername.headers.get("set-cookie"), null);
+
+  const caseInsensitiveUsername = await managerLogin(db, MANAGER_PASSWORD, "lUcKy_aDmIn2");
+  assert.equal(caseInsensitiveUsername.status, 200);
+  assert.equal((await caseInsensitiveUsername.clone().json()).username, "Lucky_Admin2");
+
+  const recoveryCredential = await managerLogin(db, MANAGER_SESSION_SECRET, "LUCKY_ADMIN2");
+  assert.equal(recoveryCredential.status, 200);
 });
 
 test("gates encoded manager aliases before static routing", async () => {
@@ -534,6 +765,21 @@ test("protects config writes with the signed session while keeping config reads 
 });
 
 test("validates top-up packages and preserves them for legacy manager writes", async () => {
+  const productionLegacyConfig = { ...VALID_CONFIG, topups: LEGACY_DEFAULT_TOPUPS };
+  delete productionLegacyConfig.economy;
+  const productionLegacyDb = createConfigDb(productionLegacyConfig);
+  const migratedLegacyRead = await apiFetch(productionLegacyDb);
+  assert.equal(migratedLegacyRead.status, 200);
+  const migratedLegacyBody = await migratedLegacyRead.json();
+  assert.deepEqual(migratedLegacyBody.config.topups, NATURAL_DEFAULT_TOPUPS);
+  assert.deepEqual(migratedLegacyBody.config.economy, { coinsPerToken: 50, myrPerToken: 1 });
+
+  const customTopups = [{ id: "starter", price: 4.9, coins: 5001 }];
+  const customLegacyDb = createConfigDb({ ...VALID_CONFIG, topups: customTopups });
+  const customLegacyRead = await apiFetch(customLegacyDb);
+  assert.equal(customLegacyRead.status, 200);
+  assert.deepEqual((await customLegacyRead.json()).config.topups, customTopups);
+
   const db = createConfigDb();
   const loggedIn = await managerLogin(db);
   const { cookie } = readSessionCookie(loggedIn);
