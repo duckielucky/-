@@ -245,6 +245,12 @@ test("ships the game systems and installable assets", async () => {
   assert.match(manager, /id="playerLookup"[^>]*type="search"[^>]*list="playerNameOptions"/);
   assert.match(manager, /id="playerWon"/);
   assert.match(manager, /id="playerSpent"/);
+  assert.match(manager, /id="playerIdentity"[^>]*hidden/);
+  assert.match(manager, /id="playerDisplayName"/);
+  assert.match(manager, /id="playerUsername"/);
+  assert.match(manager, /id="playerKind"/);
+  assert.match(manager, /id="playerTopupLog"/);
+  assert.match(manager, /充值历史/);
   assert.match(manager, /id="playerLog"/);
   assert.match(manager, /id="playerSearchForm"[^>]*role="search"/);
   assert.match(manager, /id="playerNameOptions"/);
@@ -284,7 +290,12 @@ test("ships the game systems and installable assets", async () => {
   assert.equal((manager.match(/保存所有未发布更改/g) ?? []).length, 2);
   assert.match(manager, /if \(normalizePlayerUsername\(\$\("playerLookup"\)\.value\)\) renderPlayerReport\(\)/);
   assert.match(manager, /PLAYER_SAVE_PREFIX \+ username/);
-  assert.match(manager, /var detailParts = \[labels\[entry\.k\]\]/);
+  assert.match(manager, /var detailParts = \[label\]/);
+  assert.match(manager, /username === "testplayer"/);
+  assert.match(manager, /isTestPlayer \? "测试玩家" : "玩家"/);
+  assert.match(manager, /var topups = log\.filter\(function \(entry\) \{\s*return entry && typeof entry === "object" && entry\.k === "topup";/);
+  assert.match(manager, /appendPlayerLogRow\(\$\("playerTopupLog"\), entry, PLAYER_LOG_LABELS\.topup\)/);
+  assert.match(manager, /developer: "开发者试用"/);
   assert.match(manager, /删除套餐/);
   assert.match(manager, /defaultTopupTokens = 10/);
   assert.match(manager, /defaultTopupTokens \* cfg\.economy\.myrPerToken/);

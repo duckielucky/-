@@ -367,6 +367,14 @@
   .economy-summary b{color:var(--ink)}
   .player-report-controls{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:end}
   .player-report-meta{margin:10px 0 0;color:var(--dim);font-size:11px;line-height:1.55}
+  .player-identity{display:grid;grid-template-columns:42px minmax(0,1fr) auto;gap:11px;align-items:center;margin-top:14px;padding:11px 12px;border:1px solid var(--line);border-radius:12px;background:linear-gradient(135deg,#a83cff12,#2ce9d30a)}
+  .player-identity-avatar{display:grid;place-items:center;width:42px;height:42px;border:1px solid #b15bff55;border-radius:12px;background:#a83cff1c;color:#e9c9ff;font-family:var(--mono);font-size:17px;font-weight:800;text-transform:uppercase}
+  .player-identity-copy{display:grid;gap:4px;min-width:0}
+  .player-identity-copy b,.player-identity-copy span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .player-identity-copy b{font-size:14px;color:var(--ink)}
+  .player-identity-copy span{font-family:var(--mono);font-size:10px;color:var(--dim)}
+  .player-kind{padding:6px 9px;border:1px solid #2ce9d344;border-radius:999px;background:#2ce9d312;color:var(--cyan);font-family:var(--mono);font-size:10px;white-space:nowrap}
+  .player-kind.is-test{border-color:#ffd76e55;background:#ffd76e12;color:var(--gold)}
   .player-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;margin-top:14px;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--line)}
   .player-stats div{display:grid;gap:5px;padding:12px;background:var(--panel)}
   .player-stats span{color:var(--dim);font-size:10px}
@@ -385,6 +393,8 @@
     .topup-row{grid-template-columns:32px 1fr auto}
     .topup-row .field:nth-of-type(2){grid-column:2/4}
     .player-stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .player-identity{grid-template-columns:38px minmax(0,1fr) auto}
+    .player-identity-avatar{width:38px;height:38px}
     .player-log-row{grid-template-columns:74px minmax(0,1fr);gap:7px}
     .player-log-row b{grid-column:2}
   }
@@ -1212,6 +1222,14 @@
         <datalist id="playerNameOptions"></datalist>
         <button class="btn" id="btnPlayerLookup" type="submit">搜索</button>
       </form>
+      <div class="player-identity" id="playerIdentity" hidden>
+        <div class="player-identity-avatar" id="playerIdentityAvatar" aria-hidden="true">P</div>
+        <div class="player-identity-copy">
+          <b id="playerDisplayName">—</b>
+          <span id="playerUsername">—</span>
+        </div>
+        <span class="player-kind" id="playerKind">玩家</span>
+      </div>
       <p class="player-report-meta" id="playerReportMeta">搜索本浏览器保存的玩家记录。不会显示密码或安全资料。</p>
       <div class="player-stats" id="playerStats" hidden>
         <div><span>代币余额</span><b id="playerBalance">—</b></div>
@@ -1221,6 +1239,8 @@
         <div><span>购票花费（虚拟）</span><b id="playerSpent">—</b></div>
         <div><span>游戏净额</span><b id="playerNet">—</b></div>
       </div>
+      <div class="transaction-head"><h3>充值历史</h3><span>玩家充值</span></div>
+      <div class="player-log" id="playerTopupLog"><div class="player-log-empty">尚未读取充值记录</div></div>
       <div class="transaction-head"><h3>交易流</h3><span>最近 80 笔</span></div>
       <div class="player-log" id="playerLog"><div class="player-log-empty">尚未读取玩家记录</div></div>
     </section>
@@ -1622,7 +1642,7 @@
     player: {
       title: "玩家记录", sub: "查看当前浏览器里某个本地玩家的进度",
       body: [
-        { h: "能看到什么", p: "输入用户名后可查看余额、等级、票数、输赢与最近 80 笔交易流；玩家充值会保留套餐与 RM 参考价，作弊加币会标成<b>开发者试用</b>。" },
+        { h: "能看到什么", p: "输入用户名后可查看玩家名称、余额、输赢、充值历史与最近 80 笔交易流；作弊加币会标成<b>开发者试用</b>。" },
         { h: "数据在哪里", p: "玩家账号与进度目前只保存在同一浏览器的本地存储，所以这里只能读取<b>这台设备</b>玩过的玩家。不会读取或显示密码、哈希或安全字段。" },
         { warn: "这不是跨设备的正式玩家账本。若要查看所有真实玩家，必须把账号与交易记录迁移到受保护的云端数据库。" }
       ]
@@ -2180,13 +2200,50 @@
   function playerAmountText(coins) {
     return tokenText(coins) + " · " + myrText(coins);
   }
-  function setPlayerReportEmpty(message) {
-    $("playerStats").hidden = true;
-    $("playerLog").innerHTML = "";
+  var PLAYER_LOG_LABELS = { buy: "购票", win: "中奖", daily: "旧版每日奖励", rescue: "救济", topup: "玩家充值（演示）", developer: "开发者试用" };
+  function setPlayerLogEmpty(target, message) {
+    target.innerHTML = "";
     var empty = document.createElement("div");
     empty.className = "player-log-empty";
     empty.textContent = message;
-    $("playerLog").appendChild(empty);
+    target.appendChild(empty);
+  }
+  function playerEntryDetail(entry, label) {
+    var detailParts = [label];
+    if (entry.k === "topup") {
+      if (typeof entry.packageId === "string" && entry.packageId.trim()) detailParts.push("套餐 " + entry.packageId.trim().slice(0, 40));
+      var priceMyr = Number(entry.priceMyr);
+      if (isFinite(priceMyr) && priceMyr >= 0) detailParts.push("RM " + priceMyr.toFixed(2));
+      else if (typeof entry.n === "string" && entry.n.trim()) detailParts.push(entry.n.trim().slice(0, 80));
+    } else if (typeof entry.n === "string" && entry.n.trim()) {
+      detailParts.push(entry.n.trim().slice(0, 80));
+    }
+    return detailParts.join(" · ");
+  }
+  function appendPlayerLogRow(target, entry, label) {
+    var signedAmount = Number(entry.a);
+    if (!isFinite(signedAmount)) signedAmount = 0;
+    var amount = Math.abs(signedAmount);
+    var row = document.createElement("div");
+    row.className = "player-log-row";
+    var time = document.createElement("time");
+    var timestamp = Number(entry.t);
+    var date = isFinite(timestamp) && timestamp > 0 ? new Date(timestamp) : null;
+    time.textContent = date && !isNaN(date.getTime()) ? date.toLocaleDateString("zh-CN", { month: "2-digit", day: "2-digit" }) + " " + date.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" }) : "—";
+    var detail = document.createElement("span");
+    detail.textContent = playerEntryDetail(entry, label);
+    var value = document.createElement("b");
+    var negative = entry.k === "buy" || signedAmount < 0;
+    value.textContent = (negative ? "−" : "+") + tokenText(amount);
+    value.style.color = negative ? "var(--danger)" : "var(--ok)";
+    row.appendChild(time); row.appendChild(detail); row.appendChild(value);
+    target.appendChild(row);
+  }
+  function setPlayerReportEmpty(message) {
+    $("playerIdentity").hidden = true;
+    $("playerStats").hidden = true;
+    setPlayerLogEmpty($("playerTopupLog"), message === "尚未读取玩家记录" ? "尚未读取充值记录" : message);
+    setPlayerLogEmpty($("playerLog"), message);
   }
   function renderPlayerReport() {
     var rawUsername = String($("playerLookup").value || "").trim();
@@ -2227,6 +2284,15 @@
     var won = safePlayerNumber(player && player.totalWon);
     var spent = safePlayerNumber(player && player.totalSpent);
     var net = won - spent;
+    var displayName = account && typeof account.displayName === "string" ? account.displayName.trim() : "";
+    var identityName = displayName || username;
+    var isTestPlayer = username === "testplayer";
+    $("playerIdentity").hidden = false;
+    $("playerIdentityAvatar").textContent = Array.from(identityName)[0] || "P";
+    $("playerDisplayName").textContent = identityName;
+    $("playerUsername").textContent = "@" + username;
+    $("playerKind").textContent = isTestPlayer ? "测试玩家" : "玩家";
+    $("playerKind").classList.toggle("is-test", isTestPlayer);
     $("playerStats").hidden = false;
     $("playerBalance").textContent = playerAmountText(balance);
     $("playerTickets").textContent = num(tickets);
@@ -2235,47 +2301,26 @@
     $("playerSpent").textContent = playerAmountText(spent);
     $("playerNet").textContent = (net >= 0 ? "+" : "−") + playerAmountText(Math.abs(net));
     $("playerNet").style.color = net >= 0 ? "var(--ok)" : "var(--danger)";
-    var displayName = account && typeof account.displayName === "string" ? account.displayName.trim() : "";
-    $("playerReportMeta").textContent = (displayName ? displayName + " · @" : "玩家 @") + username + " · 数据仅来自当前浏览器，可被本机用户修改。";
+    $("playerReportMeta").textContent = "数据仅来自当前浏览器，可被本机用户修改。";
 
     var log = player && Array.isArray(player.log) ? player.log.slice(0, 80) : [];
-    var labels = { buy: "购票", win: "中奖", daily: "旧版每日奖励", rescue: "救济", topup: "玩家充值（演示）", developer: "开发者试用" };
     $("playerLog").innerHTML = "";
     log.forEach(function (entry) {
-      if (!entry || typeof entry !== "object" || !labels[entry.k]) return;
-      var signedAmount = Number(entry.a);
-      if (!isFinite(signedAmount)) signedAmount = 0;
-      var amount = Math.abs(signedAmount);
-      var row = document.createElement("div");
-      row.className = "player-log-row";
-      var time = document.createElement("time");
-      var timestamp = Number(entry.t);
-      var date = isFinite(timestamp) && timestamp > 0 ? new Date(timestamp) : null;
-      time.textContent = date && !isNaN(date.getTime()) ? date.toLocaleDateString("zh-CN", { month: "2-digit", day: "2-digit" }) + " " + date.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" }) : "—";
-      var detail = document.createElement("span");
-      var detailParts = [labels[entry.k]];
-      if (entry.k === "topup") {
-        if (typeof entry.packageId === "string" && entry.packageId.trim()) detailParts.push("套餐 " + entry.packageId.trim().slice(0, 40));
-        var priceMyr = Number(entry.priceMyr);
-        if (isFinite(priceMyr) && priceMyr >= 0) detailParts.push("RM " + priceMyr.toFixed(2));
-        else if (typeof entry.n === "string" && entry.n.trim()) detailParts.push(entry.n.trim().slice(0, 80));
-      } else if (typeof entry.n === "string" && entry.n.trim()) {
-        detailParts.push(entry.n.trim().slice(0, 80));
-      }
-      detail.textContent = detailParts.join(" · ");
-      var value = document.createElement("b");
-      var negative = entry.k === "buy" || signedAmount < 0;
-      value.textContent = (negative ? "−" : "+") + tokenText(amount);
-      value.style.color = negative ? "var(--danger)" : "var(--ok)";
-      row.appendChild(time); row.appendChild(detail); row.appendChild(value);
-      $("playerLog").appendChild(row);
+      if (!entry || typeof entry !== "object" || !PLAYER_LOG_LABELS[entry.k]) return;
+      appendPlayerLogRow($("playerLog"), entry, PLAYER_LOG_LABELS[entry.k]);
     });
     if (!$("playerLog").children.length) {
-      var emptyLog = document.createElement("div");
-      emptyLog.className = "player-log-empty";
-      emptyLog.textContent = "这名玩家还没有游戏记录";
-      $("playerLog").appendChild(emptyLog);
+      setPlayerLogEmpty($("playerLog"), "这名玩家还没有游戏记录");
     }
+
+    var topups = log.filter(function (entry) {
+      return entry && typeof entry === "object" && entry.k === "topup";
+    });
+    $("playerTopupLog").innerHTML = "";
+    topups.forEach(function (entry) {
+      appendPlayerLogRow($("playerTopupLog"), entry, PLAYER_LOG_LABELS.topup);
+    });
+    if (!topups.length) setPlayerLogEmpty($("playerTopupLog"), "这名玩家还没有充值记录");
   }
 
   $("playerSearchForm").onsubmit = function (event) {
