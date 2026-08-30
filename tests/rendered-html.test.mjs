@@ -231,7 +231,8 @@ test("ships the game systems and installable assets", async () => {
   assert.doesNotMatch(page, /prize-celebration-effect/);
   assert.doesNotMatch(styles, /prize-celebration-effect/);
   assert.doesNotMatch(serviceWorker, /prize-celebration-effect/);
-  assert.match(styles, /game-lottery-background\.webp/);
+  assert.match(styles, /lucky-scratch-game-ui\.webp/);
+  assert.doesNotMatch(styles, /url\("\/game-lottery-background\.webp"\)/);
   assert.match(accountStyles, /lottery-background\.webp/);
   assert.match(accountStyles, /profile-lottery-background\.webp/);
   assert.match(login, /id="loginForm"/);
@@ -327,14 +328,14 @@ test("ships the game systems and installable assets", async () => {
   assert.match(serviceWorker, /caches\.open\(CACHE\)/);
   assert.match(serviceWorker, /pathname\.startsWith\("\/api\/"\)/);
   assert.match(serviceWorker, /canonicalPathname/);
-  assert.match(serviceWorker, /const CACHE = "lucky-scratch-v15"/);
+  assert.match(serviceWorker, /const CACHE = "lucky-scratch-v16"/);
   assert.match(serviceWorker, /pathname === "\/manager\/"/);
   assert.match(serviceWorker, /pathname === "\/manager-login\/"/);
   assert.match(serviceWorker, /pathname === "\/manager-login\.html"/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
   await access(new URL("../public/og.png", import.meta.url));
   await access(new URL("../public/lottery-background.webp", import.meta.url));
-  await access(new URL("../public/game-lottery-background.webp", import.meta.url));
+  await access(new URL("../public/lucky-scratch-game-ui.webp", import.meta.url));
   await access(new URL("../public/profile-lottery-background.webp", import.meta.url));
   await access(new URL("../public/manager-login-background.webp", import.meta.url));
 });
@@ -382,7 +383,7 @@ test("records player top-ups and labels developer balance changes in the transac
   assert.match(manager, /entry\.k === "buy" \|\| signedAmount < 0/);
   assert.match(profile, /developer:\s*\{[^}]*开发者试用/s);
   assert.match(profile, /LuckyAuth\.formatCoins\(Math\.abs\(amount\)\)/);
-  assert.match(serviceWorker, /lucky-scratch-v15/);
+  assert.match(serviceWorker, /lucky-scratch-v16/);
 });
 
 test("creates, checks, and expires an HttpOnly signed manager session", async () => {

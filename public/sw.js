@@ -1,5 +1,5 @@
-const CACHE = "lucky-scratch-v15";
-const CORE = ["/", "/login.html", "/profile.html", "/lucky-account.css", "/lucky-account.js", "/lottery-background.webp", "/game-lottery-background.webp", "/profile-lottery-background.webp", "/manifest.webmanifest", "/favicon.svg"];
+const CACHE = "lucky-scratch-v16";
+const CORE = ["/", "/login.html", "/profile.html", "/lucky-account.css", "/lucky-account.js", "/lottery-background.webp", "/lucky-scratch-game-ui.webp", "/profile-lottery-background.webp", "/manifest.webmanifest", "/favicon.svg"];
 
 function canonicalPathname(pathname) {
   let current = pathname;
