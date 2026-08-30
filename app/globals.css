@@ -50,50 +50,58 @@ button { -webkit-tap-highlight-color: transparent; }
   box-shadow: 0 35px 100px #000b, inset 0 1px #ffffff20, 0 0 60px color-mix(in srgb, var(--accent) 15%, transparent);
 }
 
-.top-stats { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 10px; }
+.top-stats { display: grid; grid-template-columns: 112px minmax(80px, 1fr) 121px; align-items: center; gap: 8px; min-height: 64px; }
 .stat-button, .stat-display { min-width: 0; padding: 3px 0; border: 0; background: transparent; color: white; text-align: left; }
 .stat-button { cursor: pointer; }
-.stat-balance { border-radius: 8px; transition: transform .12s ease, filter .15s ease; }
+.stat-balance, .stat-display { min-height: 62px; padding: 11px 13px 10px; border-radius: 16px; background: #24103d url("/prismatic-balance-panel.png") center / 100% 100% no-repeat; filter: drop-shadow(0 7px 13px #030006a8); transition: transform .12s ease, filter .15s ease; }
 .stat-balance:hover { filter: brightness(1.18); }
 .stat-balance:active { transform: scale(.96); }
 .stat-balance:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
 .stat-right { text-align: right; }
-.stat-button > span, .stat-display > span { display: block; color: var(--muted); font-size: 8px; font-weight: 800; letter-spacing: .16em; }
-.stat-button strong, .stat-display strong { display: flex; align-items: center; gap: 5px; margin-top: 3px; font-size: 15px; }
+.stat-button > span, .stat-display > span { display: block; color: #d7b6ef; font-size: 8px; font-weight: 800; letter-spacing: .12em; white-space: nowrap; }
+.stat-button strong, .stat-display strong { display: flex; align-items: center; gap: 5px; margin-top: 6px; font-size: 18px; line-height: 1; text-shadow: 0 2px 10px #030006; }
 .stat-right strong { justify-content: flex-end; color: var(--gold); }
-.top-actions { display: flex; align-items: center; justify-content: flex-end; gap: 9px; min-width: 0; }
-.profile-chip { flex: none; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; border: 1px solid color-mix(in srgb, var(--accent) 55%, #ffffff26); background: #ffffff10; font-size: 17px; line-height: 1; text-decoration: none; box-shadow: inset 0 1px #ffffff26, 0 0 10px color-mix(in srgb, var(--accent) 22%, transparent); transition: transform .12s ease, filter .15s ease; }
+.top-actions { display: flex; align-items: center; justify-content: flex-end; gap: 4px; min-width: 0; }
+.top-actions .stat-right { flex: 0 0 38px; }
+.top-actions .stat-right > span { color: #d7b6ef; }
+.top-actions .stat-right strong { margin-top: 4px; font-size: 24px; }
+.profile-chip { flex: none; display: grid; place-items: center; width: 64px; height: 64px; border: 0; border-radius: 50%; background: url("/prismatic-level-orbit.png") center / contain no-repeat; color: white; font-size: 26px; line-height: 1; text-decoration: none; filter: drop-shadow(0 0 12px #943dff66); transition: transform .12s ease, filter .15s ease; }
+.profile-chip span { display: grid; place-items: center; width: 60%; height: 60%; filter: drop-shadow(0 2px 4px #020005); }
+.profile-chip .profile-avatar-clover { background: url("/lucky-clover-avatar.png") center / contain no-repeat; }
 .profile-chip:hover { filter: brightness(1.12); }
 .profile-chip:active { transform: scale(.92); }
 .profile-chip:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
-.coin-dot { width: 11px; height: 11px; border-radius: 50%; background: linear-gradient(145deg, #fff29b, #d99316); box-shadow: inset 0 0 0 2px #ffe87d, 0 0 8px #ffd55555; }
-.brand-mark { color: white; font-weight: 950; letter-spacing: .08em; font-size: 12px; text-align: center; line-height: 1; }
+.coin-dot { flex: none; width: 19px; height: 19px; background: url("/gold-token.png") center / contain no-repeat; filter: drop-shadow(0 0 7px #ffd45aa0); }
+.brand-mark { color: white; font-weight: 950; letter-spacing: .12em; font-size: 14px; text-align: center; line-height: 1; text-shadow: 0 0 18px #a663ff78; }
 .brand-button { padding: 0; border: 0; background: transparent; cursor: pointer; user-select: none; }
 .brand-button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 4px; border-radius: 4px; }
-.brand-mark span, .loading-mark span { display: block; margin-top: 3px; color: var(--cyan); font-size: 7px; letter-spacing: .26em; }
-.level-track { height: 2px; margin: 9px 0 0; border-radius: 2px; background: #ffffff13; overflow: hidden; }
-.level-track span { display: block; height: 100%; background: linear-gradient(90deg, var(--accent), var(--cyan)); transition: width .4s ease; }
+.brand-mark span, .loading-mark span { display: block; margin-top: 5px; color: var(--cyan); font-size: 7px; letter-spacing: .31em; }
+.level-track { height: 3px; margin: 8px 3px 0; border-radius: 4px; background: linear-gradient(90deg, #7e27be7a, #b65cff59); overflow: hidden; box-shadow: 0 0 10px #8d39ff4f; }
+.level-track span { display: block; height: 100%; background: linear-gradient(90deg, #b447ff, #28e8eb); box-shadow: 0 0 10px #2be7ef; transition: width .4s ease; }
 
-.ticket-heading { position: relative; text-align: center; padding: 15px 0 11px; }
-.ticket-kicker { display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 4px; color: #e6c9f1; font-size: 8px; font-weight: 900; letter-spacing: .2em; text-transform: uppercase; }
-.ticket-kicker button { padding: 3px 5px; border: 1px solid #ffffff22; border-radius: 5px; background: #ffffff0a; color: var(--cyan); font-size: 6px; font-weight: 900; letter-spacing: .1em; cursor: pointer; }
-.ticket-heading h1 { margin: 2px 0 0; color: var(--gold); font-size: clamp(38px, 10vw, 50px); font-weight: 950; letter-spacing: -.07em; line-height: .9; text-shadow: 0 0 26px #ffbe3266; }
+.ticket-heading { position: relative; display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(118px, .92fr); align-items: end; gap: 8px; min-height: 86px; padding: 10px 2px 7px; text-align: center; }
+.ticket-title-main { min-width: 0; }
+.ticket-kicker { display: flex; align-items: center; justify-content: center; gap: 7px; margin-bottom: 4px; color: #e6c9f1; font-size: 8px; font-weight: 900; letter-spacing: .23em; text-transform: uppercase; white-space: nowrap; }
+.ticket-kicker button { padding: 4px 6px; border: 1px solid #b150ff80; border-radius: 7px; background: #321248b8; color: var(--cyan); font-size: 7px; font-weight: 900; letter-spacing: .1em; box-shadow: inset 0 1px #ffffff1f, 0 0 10px #a340ff42; cursor: pointer; }
+.ticket-heading h1 { margin: 0; color: var(--gold); font-size: clamp(52px, 14vw, 62px); font-weight: 950; letter-spacing: -.075em; line-height: .82; text-shadow: 0 3px 0 #b86f09, 0 0 24px #ffbe328f; }
 .ticket-heading p { margin: 8px 0 0; color: var(--muted); font-size: 9px; }
-.max-badge { position: absolute; right: 0; top: 24px; padding: 5px 7px; transform: rotate(4deg); border: 1px solid color-mix(in srgb, var(--accent) 70%, white); border-radius: 7px; color: white; font-size: 6px; font-weight: 900; letter-spacing: .08em; box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 35%, transparent); }
+.max-badge { display: flex; align-items: center; justify-content: center; gap: 5px; min-height: 58px; padding: 10px 13px; background: #26103f url("/prismatic-max-plaque.png") center / 100% 100% no-repeat; color: #f2e7ff; font-size: 11px; font-weight: 900; letter-spacing: .08em; filter: drop-shadow(0 9px 13px #030006b5); }
+.max-badge strong { color: var(--gold); font-size: 22px; letter-spacing: -.02em; text-shadow: 0 0 14px #ffcb4b75; }
+.ticket-heading > .info-btn { position: absolute; top: 7px; right: 4px; width: 19px; height: 19px; margin: 0; font-size: 10px; opacity: .72; }
 
-.winning-panel { padding: 10px 11px 11px; border: 1px solid color-mix(in srgb, var(--accent) 55%, #4d2559); border-radius: 17px; background: linear-gradient(180deg, color-mix(in srgb, var(--accent-2) 48%, #2d0f3d), #30103f); box-shadow: inset 0 1px #ffffff14; }
-.section-label { display: flex; align-items: center; gap: 7px; margin-bottom: 7px; color: #f0b1ff; font-size: 7px; font-weight: 900; letter-spacing: .2em; text-align: center; }
-.section-label span { flex: 1; height: 1px; background: linear-gradient(90deg, transparent, #e16aff55); }
+.winning-panel { padding: 10px 9px 12px; border: 1px solid #ae57ff66; border-radius: 19px; background: #17062582; box-shadow: inset 0 1px #ffffff17, 0 0 28px #7f31dd1f; }
+.section-label { display: flex; align-items: center; gap: 8px; margin-bottom: 9px; color: #e9c6ff; font-size: 8px; font-weight: 900; letter-spacing: .24em; text-align: center; text-shadow: 0 0 10px #bd68ff80; }
+.section-label span { flex: 1; height: 1px; background: linear-gradient(90deg, transparent, #d479ff8a); }
 .section-label span:last-child { transform: rotate(180deg); }
-.section-label.muted { margin: 9px 3px 7px; color: #877a98; }
-.section-label.muted span { background: linear-gradient(90deg, transparent, #83758f38); }
-.winning-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-.winning-row strong { display: grid; place-items: center; aspect-ratio: 1.45; border: 1px solid #ffffff20; border-radius: 9px; background: linear-gradient(145deg, color-mix(in srgb, var(--accent) 88%, white), var(--accent-2)); color: white; font-size: 18px; box-shadow: inset 0 1px #ffffff5c, 0 5px 14px #0004, 0 0 10px color-mix(in srgb, var(--accent) 30%, transparent); }
+.section-label.muted { margin: 13px 3px 9px; color: #a395b2; text-shadow: none; }
+.section-label.muted span { background: linear-gradient(90deg, transparent, #9d83b35c); }
+.winning-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 9px; }
+.winning-row strong { display: grid; place-items: center; aspect-ratio: 1.45; border: 1px solid #dcb7ff9e; border-radius: 13px; background-color: #471598; background-image: url("/prismatic-winning-tile.webp"); background-position: center; background-size: 100% 100%; color: white; font-size: 23px; font-weight: 900; text-shadow: 0 2px 10px #210051, 0 0 7px #ffffff77; box-shadow: inset 0 1px #ffffffa8, 0 6px 15px #08000ea3, 0 0 11px #a842ff70; }
 
 .play-area { position: relative; }
-.scratch-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; }
-.scratch-tile { position: relative; aspect-ratio: 1.02; min-width: 0; border: 1px solid #ffffff12; border-radius: 10px; outline: none; background: linear-gradient(145deg, #f8f4ff, #d9cfe4); overflow: hidden; box-shadow: 0 4px 9px #0005, inset 0 0 16px #9a82ad38; }
-.scratch-tile:focus-visible { box-shadow: 0 0 0 2px var(--cyan), 0 4px 9px #0005; }
+.scratch-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.scratch-tile { position: relative; aspect-ratio: 1.02; min-width: 0; border: 1px solid #f3eaff99; border-radius: 13px; outline: none; background: linear-gradient(145deg, #f8f4ff, #d9cfe4); overflow: hidden; box-shadow: 0 6px 12px #06000ca8, 0 0 10px #bb65ff35, inset 0 0 16px #9a82ad38; }
+.scratch-tile:focus-visible { box-shadow: 0 0 0 2px var(--cyan), 0 6px 12px #06000ca8; }
 .tile-content { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #25122d; }
 .tile-content strong { font-size: 18px; font-weight: 950; line-height: 1; }
 .tile-content small { margin-top: 3px; font-size: 5.5px; font-weight: 900; letter-spacing: .04em; }
@@ -104,12 +112,13 @@ button { -webkit-tap-highlight-color: transparent; }
 .scratch-tile.is-match { border-color: var(--tile-accent); background: linear-gradient(145deg, #fffcea, #fff1b9); box-shadow: 0 0 0 1px var(--tile-accent), 0 0 18px color-mix(in srgb, var(--tile-accent) 42%, transparent); }
 @keyframes match-pop { from { transform: scale(.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 
-.tutorial-tip { position: absolute; z-index: 3; left: 50%; top: 49%; width: 178px; padding: 10px 12px; transform: translate(-50%, -50%); border: 1px solid #ffffff30; border-radius: 13px; background: #110918e8; box-shadow: 0 15px 40px #000b; pointer-events: none; text-align: center; backdrop-filter: blur(10px); }
-.tutorial-tip span { position: absolute; left: -11px; top: 18px; font-size: 28px; animation: finger-move 1.3s ease-in-out infinite; }
-.tutorial-tip b, .tutorial-tip small { display: block; }
-.tutorial-tip b { font-size: 11px; }
-.tutorial-tip small { margin-top: 3px; color: var(--muted); font-size: 7px; }
-@keyframes finger-move { 50% { transform: translate(28px, 13px) rotate(-10deg); } }
+.tutorial-tip { position: absolute; z-index: 3; left: 50%; top: 57%; display: grid; grid-template-columns: 41px 1fr; align-items: center; width: 184px; min-height: 62px; padding: 8px 11px 8px 8px; transform: translate(-50%, -50%); border: 1px solid #c85cffd1; border-radius: 999px; background: #170821ed; box-shadow: 0 16px 42px #000d, 0 0 22px #9c37ff4f, inset 0 1px #ffffff2b; pointer-events: none; text-align: left; backdrop-filter: blur(12px); }
+.tutorial-gesture { display: block; width: 40px; height: 40px; background: url("/prismatic-scratch-gesture.png") center / contain no-repeat; filter: drop-shadow(0 0 8px #9d5aff); animation: finger-move 1.3s ease-in-out infinite; }
+.tutorial-copy { min-width: 0; }
+.tutorial-copy b, .tutorial-copy small { display: block; }
+.tutorial-copy b { color: #fff; font-size: 12px; letter-spacing: .04em; }
+.tutorial-copy small { margin-top: 3px; color: #c7b5d3; font-size: 7px; white-space: nowrap; }
+@keyframes finger-move { 50% { transform: translateX(7px); } }
 
 .ticket-meta { display: grid; grid-template-columns: 1fr auto 1fr; gap: 5px; align-items: center; padding: 9px 2px 8px; color: #786b88; font-size: 7px; }
 .ticket-meta strong { color: #a79bb8; font-weight: 800; }
@@ -435,8 +444,29 @@ button { -webkit-tap-highlight-color: transparent; }
 @media (max-width: 360px) {
   .app-shell { padding-inline: 7px; }
   .game-card { padding: 11px 11px 9px; border-radius: 23px; }
-  .ticket-heading { padding-block: 11px 9px; }
+  .top-stats { grid-template-columns: 101px minmax(70px, 1fr) 105px; gap: 3px; min-height: 58px; }
+  .stat-balance, .stat-display { min-height: 57px; padding: 9px 11px 8px; border-radius: 14px; }
+  .stat-button > span, .stat-display > span { font-size: 7px; letter-spacing: .08em; }
+  .stat-button strong, .stat-display strong { gap: 4px; margin-top: 6px; font-size: 18px; }
+  .coin-dot { width: 18px; height: 18px; }
+  .brand-mark { font-size: 11px; }
+  .brand-mark span { margin-top: 4px; font-size: 6px; }
+  .profile-chip { width: 58px; height: 58px; font-size: 23px; }
+  .top-actions .stat-right { flex-basis: 33px; }
+  .top-actions .stat-right strong { font-size: 22px; }
+  .level-track { margin-top: 8px; }
+  .ticket-heading { grid-template-columns: minmax(0, 1.25fr) minmax(104px, .85fr); min-height: 80px; padding-block: 9px 7px; }
+  .ticket-kicker { gap: 5px; font-size: 7px; letter-spacing: .15em; }
+  .ticket-kicker button { padding: 4px 5px; font-size: 6px; }
+  .ticket-heading h1 { font-size: 53px; }
+  .max-badge { min-height: 53px; padding: 9px 10px; gap: 4px; font-size: 10px; }
+  .max-badge strong { font-size: 21px; }
   .scratch-grid { gap: 5px; }
+  .winning-row { gap: 6px; }
+  .winning-row strong { border-radius: 10px; font-size: 20px; }
+  .scratch-tile { border-radius: 10px; }
+  .tutorial-tip { width: 174px; min-height: 58px; grid-template-columns: 38px 1fr; }
+  .tutorial-gesture { width: 36px; height: 36px; }
   .tile-content strong { font-size: 15px; }
   .action-bar > button { min-height: 46px; }
 }

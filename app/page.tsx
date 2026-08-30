@@ -66,6 +66,23 @@ type Player = {
 const SAVE_KEY = "lucky_save_v1";
 const SESSION_KEY = "lucky_session_v1";
 const ACCOUNTS_KEY = "lucky_accounts_v1";
+const SCRATCH_FOIL_SRC = "/prismatic-scratch-foil.webp";
+let scratchFoilImage: HTMLImageElement | null = null;
+
+function prepareScratchFoil(onReady: () => void): () => void {
+  if (typeof window === "undefined") return () => undefined;
+  if (!scratchFoilImage) {
+    scratchFoilImage = new Image();
+    scratchFoilImage.decoding = "async";
+    scratchFoilImage.src = SCRATCH_FOIL_SRC;
+  }
+  if (scratchFoilImage.complete && scratchFoilImage.naturalWidth > 0) {
+    onReady();
+    return () => undefined;
+  }
+  scratchFoilImage.addEventListener("load", onReady, { once: true });
+  return () => scratchFoilImage?.removeEventListener("load", onReady);
+}
 
 /** The game is gated by the existing device-local login flow. */
 function hasLocalAccountSession(): boolean {
@@ -385,6 +402,7 @@ function ScratchTile({ cell, revealed, matched, accent, sound, coinsPerToken, on
   const lastPoint = useRef<{ x: number; y: number } | null>(null);
   const revealedRef = useRef(revealed);
   const lastSoundAt = useRef(0);
+  const coverTouchedRef = useRef(false);
 
   useEffect(() => { revealedRef.current = revealed; }, [revealed]);
 
@@ -399,27 +417,37 @@ function ScratchTile({ cell, revealed, matched, accent, sound, coinsPerToken, on
       const context = canvas.getContext("2d", { willReadFrequently: true });
       if (!context) return;
       if (revealedRef.current) { context.clearRect(0, 0, canvas.width, canvas.height); return; }
-      const gradient = context.createLinearGradient(0, 0, canvas.width, canvas.height);
-      gradient.addColorStop(0, "#f4eff7"); gradient.addColorStop(0.45, "#a9a0b2"); gradient.addColorStop(1, "#ddd8e0");
-      context.fillStyle = gradient;
-      context.fillRect(0, 0, canvas.width, canvas.height);
-      context.globalAlpha = 0.18;
-      context.strokeStyle = "#ffffff";
-      context.lineWidth = Math.max(2, ratio);
-      for (let x = -canvas.height; x < canvas.width; x += 12 * ratio) {
-        context.beginPath(); context.moveTo(x, 0); context.lineTo(x + canvas.height, canvas.height); context.stroke();
+      context.globalCompositeOperation = "source-over";
+      context.globalAlpha = 1;
+      context.clearRect(0, 0, canvas.width, canvas.height);
+      if (scratchFoilImage?.complete && scratchFoilImage.naturalWidth > 0) {
+        context.drawImage(scratchFoilImage, 0, 0, canvas.width, canvas.height);
+      } else {
+        const fallback = context.createLinearGradient(0, 0, canvas.width, canvas.height);
+        fallback.addColorStop(0, "#fbf8ff"); fallback.addColorStop(0.52, "#c4bad2"); fallback.addColorStop(1, "#eee9f5");
+        context.fillStyle = fallback;
+        context.fillRect(0, 0, canvas.width, canvas.height);
       }
-      context.globalAlpha = 0.8;
-      context.fillStyle = "#5d5364";
-      context.font = `800 ${Math.max(7, rect.width * 0.11) * ratio}px Arial`;
+      context.globalAlpha = 0.88;
+      context.fillStyle = "#554764";
+      context.shadowColor = "#ffffffa8";
+      context.shadowBlur = 2.5 * ratio;
+      context.font = `850 ${Math.max(8, rect.width * 0.125) * ratio}px Arial`;
       context.textAlign = "center"; context.textBaseline = "middle";
       context.fillText("刮开", canvas.width / 2, canvas.height / 2);
+      context.shadowBlur = 0;
       context.globalAlpha = 1;
     };
     drawCover();
-    const observer = new ResizeObserver(drawCover);
+    const stopWaitingForFoil = prepareScratchFoil(() => {
+      if (!coverTouchedRef.current && !revealedRef.current) drawCover();
+    });
+    const observer = new ResizeObserver(() => {
+      coverTouchedRef.current = false;
+      drawCover();
+    });
     observer.observe(canvas);
-    return () => observer.disconnect();
+    return () => { observer.disconnect(); stopWaitingForFoil(); };
   }, []);
 
   const revealIfReady = useCallback(() => {
@@ -480,7 +508,7 @@ function ScratchTile({ cell, revealed, matched, accent, sound, coinsPerToken, on
         ref={canvasRef}
         className="scratch-canvas"
         aria-hidden="true"
-        onPointerDown={(event) => { if (revealedRef.current) return; drawingRef.current = true; onScratchStart(); event.currentTarget.setPointerCapture(event.pointerId); const point = pointFor(event); lastPoint.current = point; eraseTo(point); }}
+        onPointerDown={(event) => { if (revealedRef.current) return; coverTouchedRef.current = true; drawingRef.current = true; onScratchStart(); event.currentTarget.setPointerCapture(event.pointerId); const point = pointFor(event); lastPoint.current = point; eraseTo(point); }}
         onPointerMove={(event) => { if (!drawingRef.current || revealedRef.current) return; eraseTo(pointFor(event)); revealIfReady(); }}
         onPointerUp={(event) => { drawingRef.current = false; lastPoint.current = null; try { event.currentTarget.releasePointerCapture(event.pointerId); } catch { /* Some browsers release capture automatically. */ } revealIfReady(); }}
         onPointerCancel={() => { drawingRef.current = false; lastPoint.current = null; revealIfReady(); }}
@@ -1092,19 +1120,21 @@ export default function Home() {
             : <div className="stat-display"><span>代币余额</span><strong><i className="coin-dot" />{tokenAmount(player.coins)}</strong></div>}
           <button type="button" className="brand-mark brand-button" onClick={bumpBrandTap}>LUCKY<span>SCRATCH</span></button>
           <div className="top-actions">
+            <a className="profile-chip" href="/profile.html" aria-label="我的"><span className={!profileAvatar || profileAvatar === "🍀" ? "profile-avatar-clover" : undefined}>{profileAvatar && profileAvatar !== "🍀" ? profileAvatar : null}</span></a>
             <button className="stat-button stat-right" onClick={() => setPanel("collection")} aria-label="打开收藏">
               <span>等级</span><strong>{String(player.level).padStart(2, "0")}</strong>
             </button>
-            <a className="profile-chip" href="/profile.html" aria-label="我的">{profileAvatar || "👤"}</a>
           </div>
         </header>
 
         <div className="level-track" aria-label={`距离升级还差 ${5 - progressInLevel} 张`}><span style={{ width: `${(progressInLevel / 5) * 100}%` }} /></div>
 
         <div className="ticket-heading">
-          <div className="ticket-kicker"><span>{ticketType.name}</span><button onClick={() => setPanel("shop")}>更换</button></div>
-          <div className="max-badge">最高 {ticketType.maxLabel}</div>
-          <h1>{ticketType.shortName}</h1>
+          <div className="ticket-title-main">
+            <div className="ticket-kicker"><span>{ticketType.name}</span><button onClick={() => setPanel("shop")}>更换</button></div>
+            <h1>{ticketType.shortName}</h1>
+          </div>
+          <div className="max-badge"><span>最高</span><strong>{ticketType.maxLabel}</strong></div>
           <button className="info-btn" type="button" onClick={() => setShowHelp(true)} aria-label="玩法说明">i</button>
         </div>
 
@@ -1120,7 +1150,7 @@ export default function Home() {
               <ScratchTile key={`${ticket.id}-${index}`} cell={cell} revealed={ticket.scratched[index]} matched={matchedIndices.has(index)} accent={ticketType.accent} sound={player.settings.sound} coinsPerToken={config.economy.coinsPerToken} onScratchStart={scratchStart} onReveal={() => revealCell(index)} />
             ))}
           </div>
-          {!player.tutorialSeen && !ticket.settled && <div className="tutorial-tip"><span>☝</span><b>拖动刮开</b><small>刮开银色区块即可开始</small></div>}
+          {!player.tutorialSeen && !ticket.settled && <div className="tutorial-tip"><span className="tutorial-gesture" aria-hidden="true" /><span className="tutorial-copy"><b>拖动刮开</b><small>刮开银色区块即可开始</small></span></div>}
         </section>
 
         <div className="ticket-meta"><span>{scratchedCount}/16 已刮开</span><strong>单价 {tokenAmount(ticketType.cost)} 代币</strong><span>最高 {tokenAmount(player.bestWins[ticketType.id] || 0)}</span></div>

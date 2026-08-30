@@ -232,6 +232,14 @@ test("ships the game systems and installable assets", async () => {
   assert.doesNotMatch(styles, /prize-celebration-effect/);
   assert.doesNotMatch(serviceWorker, /prize-celebration-effect/);
   assert.match(styles, /lucky-scratch-game-ui\.webp/);
+  assert.match(styles, /prismatic-balance-panel\.png/);
+  assert.match(styles, /prismatic-level-orbit\.png/);
+  assert.match(styles, /prismatic-max-plaque\.png/);
+  assert.match(styles, /gold-token\.png/);
+  assert.match(styles, /lucky-clover-avatar\.png/);
+  assert.match(styles, /prismatic-winning-tile\.webp/);
+  assert.match(page, /prismatic-scratch-foil\.webp/);
+  assert.match(styles, /prismatic-scratch-gesture\.png/);
   assert.doesNotMatch(styles, /url\("\/game-lottery-background\.webp"\)/);
   assert.match(accountStyles, /lottery-background\.webp/);
   assert.match(accountStyles, /profile-lottery-background\.webp/);
@@ -328,7 +336,7 @@ test("ships the game systems and installable assets", async () => {
   assert.match(serviceWorker, /caches\.open\(CACHE\)/);
   assert.match(serviceWorker, /pathname\.startsWith\("\/api\/"\)/);
   assert.match(serviceWorker, /canonicalPathname/);
-  assert.match(serviceWorker, /const CACHE = "lucky-scratch-v16"/);
+  assert.match(serviceWorker, /const CACHE = "lucky-scratch-v18"/);
   assert.match(serviceWorker, /pathname === "\/manager\/"/);
   assert.match(serviceWorker, /pathname === "\/manager-login\/"/);
   assert.match(serviceWorker, /pathname === "\/manager-login\.html"/);
@@ -336,6 +344,14 @@ test("ships the game systems and installable assets", async () => {
   await access(new URL("../public/og.png", import.meta.url));
   await access(new URL("../public/lottery-background.webp", import.meta.url));
   await access(new URL("../public/lucky-scratch-game-ui.webp", import.meta.url));
+  await access(new URL("../public/prismatic-balance-panel.png", import.meta.url));
+  await access(new URL("../public/prismatic-level-orbit.png", import.meta.url));
+  await access(new URL("../public/prismatic-max-plaque.png", import.meta.url));
+  await access(new URL("../public/gold-token.png", import.meta.url));
+  await access(new URL("../public/lucky-clover-avatar.png", import.meta.url));
+  await access(new URL("../public/prismatic-winning-tile.webp", import.meta.url));
+  await access(new URL("../public/prismatic-scratch-foil.webp", import.meta.url));
+  await access(new URL("../public/prismatic-scratch-gesture.png", import.meta.url));
   await access(new URL("../public/profile-lottery-background.webp", import.meta.url));
   await access(new URL("../public/manager-login-background.webp", import.meta.url));
 });
@@ -383,7 +399,7 @@ test("records player top-ups and labels developer balance changes in the transac
   assert.match(manager, /entry\.k === "buy" \|\| signedAmount < 0/);
   assert.match(profile, /developer:\s*\{[^}]*开发者试用/s);
   assert.match(profile, /LuckyAuth\.formatCoins\(Math\.abs\(amount\)\)/);
-  assert.match(serviceWorker, /lucky-scratch-v16/);
+  assert.match(serviceWorker, /lucky-scratch-v18/);
 });
 
 test("creates, checks, and expires an HttpOnly signed manager session", async () => {
