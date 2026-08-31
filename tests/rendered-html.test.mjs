@@ -240,6 +240,23 @@ test("ships the game systems and installable assets", async () => {
   assert.match(styles, /prismatic-winning-tile\.webp/);
   assert.match(page, /prismatic-scratch-foil\.webp/);
   assert.match(styles, /prismatic-scratch-gesture\.png/);
+  assert.match(page, /revealed \? "is-miss"/);
+  assert.match(page, /匹配<\/em>/);
+  assert.match(styles, /revealed-tile-miss\.png/);
+  assert.match(styles, /revealed-tile-match\.png/);
+  assert.match(styles, /revealed-match-badge\.png/);
+  assert.match(serviceWorker, /revealed-tile-miss\.png/);
+  assert.match(serviceWorker, /revealed-tile-match\.png/);
+  assert.match(serviceWorker, /revealed-match-badge\.png/);
+  assert.match(page, /collector-card-100x\.png/);
+  assert.match(page, /collector-card-locked\.png/);
+  assert.match(page, /collector-card-unlocked\.png/);
+  assert.match(styles, /collector-new-ticket-frame\.png/);
+  assert.match(styles, /action-redeem\.png/);
+  assert.match(styles, /action-reveal\.png/);
+  assert.match(page, /className="collector-carousel"/);
+  assert.match(page, /className="collector-pagination"/);
+  assert.doesNotMatch(page, /className="badge-grid"/);
   assert.doesNotMatch(styles, /url\("\/game-lottery-background\.webp"\)/);
   assert.match(accountStyles, /lottery-background\.webp/);
   assert.match(accountStyles, /profile-lottery-background\.webp/);
@@ -336,7 +353,7 @@ test("ships the game systems and installable assets", async () => {
   assert.match(serviceWorker, /caches\.open\(CACHE\)/);
   assert.match(serviceWorker, /pathname\.startsWith\("\/api\/"\)/);
   assert.match(serviceWorker, /canonicalPathname/);
-  assert.match(serviceWorker, /const CACHE = "lucky-scratch-v18"/);
+  assert.match(serviceWorker, /const CACHE = "lucky-scratch-v20"/);
   assert.match(serviceWorker, /pathname === "\/manager\/"/);
   assert.match(serviceWorker, /pathname === "\/manager-login\/"/);
   assert.match(serviceWorker, /pathname === "\/manager-login\.html"/);
@@ -352,6 +369,15 @@ test("ships the game systems and installable assets", async () => {
   await access(new URL("../public/prismatic-winning-tile.webp", import.meta.url));
   await access(new URL("../public/prismatic-scratch-foil.webp", import.meta.url));
   await access(new URL("../public/prismatic-scratch-gesture.png", import.meta.url));
+  await access(new URL("../public/revealed-tile-miss.png", import.meta.url));
+  await access(new URL("../public/revealed-tile-match.png", import.meta.url));
+  await access(new URL("../public/revealed-match-badge.png", import.meta.url));
+  await access(new URL("../public/collector-card-100x.png", import.meta.url));
+  await access(new URL("../public/collector-card-locked.png", import.meta.url));
+  await access(new URL("../public/collector-card-unlocked.png", import.meta.url));
+  await access(new URL("../public/collector-new-ticket-frame.png", import.meta.url));
+  await access(new URL("../public/action-redeem.png", import.meta.url));
+  await access(new URL("../public/action-reveal.png", import.meta.url));
   await access(new URL("../public/profile-lottery-background.webp", import.meta.url));
   await access(new URL("../public/manager-login-background.webp", import.meta.url));
 });
@@ -399,7 +425,7 @@ test("records player top-ups and labels developer balance changes in the transac
   assert.match(manager, /entry\.k === "buy" \|\| signedAmount < 0/);
   assert.match(profile, /developer:\s*\{[^}]*开发者试用/s);
   assert.match(profile, /LuckyAuth\.formatCoins\(Math\.abs\(amount\)\)/);
-  assert.match(serviceWorker, /lucky-scratch-v18/);
+  assert.match(serviceWorker, /lucky-scratch-v20/);
 });
 
 test("creates, checks, and expires an HttpOnly signed manager session", async () => {

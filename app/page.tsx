@@ -491,18 +491,18 @@ function ScratchTile({ cell, revealed, matched, accent, sound, coinsPerToken, on
 
   return (
     <div
-      className={`scratch-tile ${revealed ? "is-revealed" : ""} ${revealed && matched ? "is-match" : ""}`}
+      className={`scratch-tile ${revealed ? "is-revealed" : ""} ${revealed && matched ? "is-match" : revealed ? "is-miss" : ""}`}
       style={{ "--tile-accent": accent } as React.CSSProperties}
       role="button"
       tabIndex={0}
-      aria-label={revealed ? `${cell.number}, prize ${formatTokens(cell.prize * cell.multiplier, coinsPerToken)} tokens${matched ? ", match" : ""}` : "Covered scratch tile"}
+      aria-label={revealed ? `${cell.number}, prize ${formatTokens(cell.prize * cell.multiplier, coinsPerToken)} tokens, ${matched ? "matched" : "not matched"}` : "Covered scratch tile"}
       onKeyDown={(event) => { if (!revealed && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); onScratchStart(); onReveal(); } }}
     >
       <div className="tile-content">
         <strong>{cell.number}</strong>
-        <small>{formatTokens(cell.prize, coinsPerToken)} TOKENS</small>
+        <small>{formatTokens(cell.prize, coinsPerToken)} 代币</small>
         {cell.multiplier > 1 && <b>{cell.multiplier}X</b>}
-        {revealed && matched && <em>MATCH</em>}
+        {revealed && matched && <em aria-hidden="true">匹配</em>}
       </div>
       <canvas
         ref={canvasRef}
@@ -667,6 +667,7 @@ export default function Home() {
   const [hydrated, setHydrated] = useState(false);
   const [panel, setPanel] = useState<"shop" | "collection" | "settings" | "topup" | null>(null);
   const [selectedTopup, setSelectedTopup] = useState<TopupPackage | null>(null);
+  const [collectionIndex, setCollectionIndex] = useState(0);
   const [showHelp, setShowHelp] = useState(false);
   useEffect(() => { if (!showHelp) return; const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setShowHelp(false); }; window.addEventListener("keydown", onKey); return () => window.removeEventListener("keydown", onKey); }, [showHelp]);
   const [toast, setToast] = useState("");
@@ -685,6 +686,7 @@ export default function Home() {
   const gameCardRef = useRef<HTMLElement>(null);
   const sheetRef = useRef<HTMLElement>(null);
   const topupConfirmRef = useRef<HTMLDivElement>(null);
+  const collectionCarouselRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!panel) return;
@@ -896,6 +898,7 @@ export default function Home() {
 
   const ticketType = ticket?.typeSnapshot || config.types.find((type) => type.id === ticket?.typeId) || config.types[0];
   const selectedType = config.types.find((type) => type.id === player.selectedTicketId) || config.types[0];
+  const activeCollectionIndex = Math.min(collectionIndex, Math.max(0, config.types.length - 1));
   const tokenAmount = (coins: number) => formatTokens(coins, config.economy.coinsPerToken);
   const scratchedCount = ticket?.scratched.filter(Boolean).length || 0;
   const progressInLevel = player.ticketsPlayed % 5;
@@ -1155,10 +1158,20 @@ export default function Home() {
 
         <div className="ticket-meta"><span>{scratchedCount}/16 已刮开</span><strong>单价 {tokenAmount(ticketType.cost)} 代币</strong><span>最高 {tokenAmount(player.bestWins[ticketType.id] || 0)}</span></div>
 
-        <nav className="action-bar" aria-label="Game actions">
-          <button disabled={ticket.settled || scratchedCount < 8} onClick={() => settle(true)}><span>✓</span>兑奖</button>
-          <button className="primary" disabled={player.coins < selectedType.cost || player.level < selectedType.unlockLevel} onClick={buyNewTicket}><span>＋</span>新的一张<small>{tokenAmount(selectedType.cost)} 代币</small></button>
-          <button disabled={ticket.settled} onClick={() => settle(true)}><span>✦</span>全部刮开</button>
+        <nav className="action-bar album-action-bar" aria-label="Game actions">
+          <div className="album-secondary-actions">
+            <button type="button" disabled={ticket.settled || scratchedCount < 8} onClick={() => settle(true)}>
+              <i className="action-redeem-icon" aria-hidden="true" />
+              <span>兑奖</span>
+            </button>
+            <button type="button" disabled={ticket.settled} onClick={() => settle(true)}>
+              <i className="action-reveal-icon" aria-hidden="true" />
+              <span>全部刮开</span>
+            </button>
+          </div>
+          <button type="button" className="primary album-primary-ticket" disabled={player.coins < selectedType.cost || player.level < selectedType.unlockLevel} onClick={buyNewTicket}>
+            <span className="album-ticket-copy"><b>新的一张</b><small>{tokenAmount(selectedType.cost)} 代币</small></span>
+          </button>
         </nav>
 
         {canRescue && <button className="rescue-banner" onClick={claimRescue}>代币不足？领取每日救济 <b>+{tokenAmount(1500)}</b></button>}
@@ -1230,7 +1243,7 @@ export default function Home() {
 
       {panel && (
         <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) { setSelectedTopup(null); setPanel(null); } }}>
-          <section ref={sheetRef} tabIndex={-1} className="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title">
+          <section ref={sheetRef} tabIndex={-1} className={`sheet${panel === "collection" ? " collection-sheet" : ""}`} role="dialog" aria-modal="true" aria-labelledby="sheet-title">
             <div className="sheet-handle" />
             <header><div><span>LUCKY SCRATCH</span><h2 id="sheet-title">{panel === "shop" ? "票种商店" : panel === "collection" ? "我的收藏" : panel === "topup" ? "充值虚拟代币" : "设置"}</h2></div><button onClick={() => { setSelectedTopup(null); setPanel(null); }} aria-label="关闭">×</button></header>
 
@@ -1263,8 +1276,49 @@ export default function Home() {
 
             {panel === "collection" && <div className="collection-content">
               <div className="collection-hero"><span>等级 {player.level}</span><strong>{player.ticketsPlayed}</strong><p>已刮张数</p><div><i style={{ width: `${(progressInLevel / 5) * 100}%` }} /></div><small>再刮 {5 - progressInLevel} 张升到 {player.level + 1} 级</small></div>
-              <div className="badge-grid">{config.types.map((type) => { const unlocked = player.level >= type.unlockLevel; return <article key={type.id} className={unlocked ? "" : "badge-locked"}><span style={{ background: `linear-gradient(145deg,${type.accent},${type.accent2})` }}>{unlocked ? "♛" : "⌁"}</span><h3>{type.shortName}</h3><p>{unlocked ? `最高 ${tokenAmount(player.bestWins[type.id] || 0)} 代币` : `${type.unlockLevel} 级解锁`}</p></article>; })}</div>
-              <p className="collection-note">同一票种刮满 50 张即可获得金色收藏徽章。</p>
+              <div
+                ref={collectionCarouselRef}
+                className="collector-carousel"
+                aria-label="票种收藏册"
+                onScroll={(event) => {
+                  const carousel = event.currentTarget;
+                  const center = carousel.scrollLeft + carousel.clientWidth / 2;
+                  let nextIndex = 0;
+                  let nearest = Number.POSITIVE_INFINITY;
+                  Array.from(carousel.children).forEach((child, index) => {
+                    const card = child as HTMLElement;
+                    const distance = Math.abs(card.offsetLeft + card.offsetWidth / 2 - center);
+                    if (distance < nearest) { nearest = distance; nextIndex = index; }
+                  });
+                  setCollectionIndex(nextIndex);
+                }}
+              >
+                {config.types.map((type, index) => {
+                  const unlocked = player.level >= type.unlockLevel;
+                  const cardArt = unlocked
+                    ? type.id === "starter_100x" ? "/collector-card-100x.png" : "/collector-card-unlocked.png"
+                    : "/collector-card-locked.png";
+                  return <article key={type.id} className={`collector-card${unlocked ? " is-unlocked" : " is-locked"}${activeCollectionIndex === index ? " is-active" : ""}`} aria-label={`${type.shortName}，${unlocked ? "已解锁" : `${type.unlockLevel} 级解锁`}`} aria-current={activeCollectionIndex === index ? "true" : undefined}>
+                    <span className="collector-card-art" style={{ backgroundImage: `url(${cardArt})` }} aria-hidden="true" />
+                    <h3>{type.shortName}</h3>
+                    <p>{unlocked ? `最高 ${tokenAmount(player.bestWins[type.id] || 0)} 代币` : `${type.unlockLevel} 级解锁`}</p>
+                  </article>;
+                })}
+              </div>
+              <div className="collector-pagination" aria-label="选择收藏卡片">
+                {config.types.map((type, index) => <button
+                  key={type.id}
+                  type="button"
+                  className={activeCollectionIndex === index ? "is-active" : ""}
+                  aria-label={`查看 ${type.shortName}`}
+                  aria-pressed={activeCollectionIndex === index}
+                  onClick={() => {
+                    setCollectionIndex(index);
+                    const card = collectionCarouselRef.current?.children[index] as HTMLElement | undefined;
+                    card?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+                  }}
+                />)}
+              </div>
             </div>}
 
             {panel === "settings" && <div className="settings-list">

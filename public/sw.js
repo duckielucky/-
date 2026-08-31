@@ -1,5 +1,5 @@
-const CACHE = "lucky-scratch-v18";
-const CORE = ["/", "/login.html", "/profile.html", "/lucky-account.css", "/lucky-account.js", "/lottery-background.webp", "/lucky-scratch-game-ui.webp", "/prismatic-balance-panel.png", "/prismatic-level-orbit.png", "/prismatic-max-plaque.png", "/gold-token.png", "/lucky-clover-avatar.png", "/prismatic-winning-tile.webp", "/prismatic-scratch-foil.webp", "/prismatic-scratch-gesture.png", "/profile-lottery-background.webp", "/manifest.webmanifest", "/favicon.svg"];
+const CACHE = "lucky-scratch-v20";
+const CORE = ["/", "/login.html", "/profile.html", "/lucky-account.css", "/lucky-account.js", "/lottery-background.webp", "/lucky-scratch-game-ui.webp", "/prismatic-balance-panel.png", "/prismatic-level-orbit.png", "/prismatic-max-plaque.png", "/gold-token.png", "/lucky-clover-avatar.png", "/prismatic-winning-tile.webp", "/prismatic-scratch-foil.webp", "/prismatic-scratch-gesture.png", "/revealed-tile-miss.png", "/revealed-tile-match.png", "/revealed-match-badge.png", "/collector-card-100x.png", "/collector-card-locked.png", "/collector-card-unlocked.png", "/collector-new-ticket-frame.png", "/action-redeem.png", "/action-reveal.png", "/profile-lottery-background.webp", "/manifest.webmanifest", "/favicon.svg"];
 
 function canonicalPathname(pathname) {
   let current = pathname;
