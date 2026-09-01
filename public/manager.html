@@ -388,6 +388,31 @@
   .player-log-row span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .player-log-row b{font-family:var(--mono);white-space:nowrap}
   .player-log-empty{padding:20px;border:1px dashed var(--line-strong);border-radius:10px;color:var(--dim);font-size:12px;text-align:center}
+  .player-editor{margin-top:16px;padding:15px;border:1px solid #a83cff4f;border-radius:14px;background:linear-gradient(145deg,#251033cc,#100716e8);box-shadow:inset 0 1px #ffffff0a}
+  .player-editor-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+  .player-editor-head h3{margin:0;font-family:var(--mono);font-size:13px;letter-spacing:.08em;color:var(--ink)}
+  .player-editor-head span{padding:5px 8px;border:1px solid #a83cff44;border-radius:999px;background:#a83cff12;color:#d9a8ff;font-family:var(--mono);font-size:9px}
+  .player-editor-section{display:grid;gap:12px;padding:13px;border:1px solid var(--line);border-radius:12px;background:#08040d66}
+  .player-editor-section+.player-editor-section{margin-top:10px}
+  .player-editor-section-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+  .player-editor-section-head h4{margin:0;font-size:12px;color:var(--ink)}
+  .player-editor-section-head p{margin:0;color:var(--dim);font-size:10px;text-align:right}
+  .player-editor-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+  .player-editor .field small{color:var(--dim);font-size:9px;line-height:1.45}
+  .player-editor fieldset{min-width:0;margin:0;padding:0;border:0}
+  .player-editor fieldset:disabled{opacity:.46}
+  .player-editor-checks{display:flex;flex-wrap:wrap;gap:8px}
+  .player-editor-checks label{display:flex;align-items:center;gap:7px;min-height:38px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:#ffffff06;color:var(--muted);font-size:10px}
+  .player-editor-checks input{accent-color:var(--ta)}
+  .player-best-wins{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .player-best-win{display:grid;grid-template-columns:minmax(0,1fr) minmax(100px,.55fr);gap:8px;align-items:center;padding:8px 9px;border:1px solid var(--line);border-radius:10px;background:#ffffff05}
+  .player-best-win label{min-width:0;color:var(--muted);font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .player-best-win input{width:100%;padding:7px 8px;border:1px solid var(--line-strong);border-radius:8px;background:#00000038;font-family:var(--mono);font-size:11px}
+  .player-editor-status{min-height:16px;margin:10px 0 0;color:var(--dim);font-size:10px;line-height:1.5}
+  .player-editor-status.is-error{color:var(--danger)}
+  .player-editor-actions{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px}
+  .player-editor-danger{display:flex;gap:8px;flex-wrap:wrap}
+  .player-editor-save{min-width:150px}
   .player-overview-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;margin-top:14px;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--line)}
   .player-overview-kpis div{display:grid;gap:5px;padding:13px;background:#100716}
   .player-overview-kpis span{color:var(--dim);font-size:10px}
@@ -426,6 +451,10 @@
     .player-identity-avatar{width:38px;height:38px}
     .player-log-row{grid-template-columns:74px minmax(0,1fr);gap:7px}
     .player-log-row b{grid-column:2}
+    .player-editor-grid,.player-best-wins{grid-template-columns:1fr}
+    .player-editor-actions{align-items:stretch;flex-direction:column-reverse}
+    .player-editor-danger{display:grid;grid-template-columns:1fr 1fr}
+    .player-editor-save{width:100%}
     .player-overview-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
     .player-overview-grid{grid-template-columns:1fr}
   }
@@ -1304,6 +1333,52 @@
         <div><span>购票花费（虚拟）</span><b id="playerSpent">—</b></div>
         <div><span>游戏净额</span><b id="playerNet">—</b></div>
       </div>
+      <div class="player-editor" id="playerEditor" hidden>
+        <div class="player-editor-head"><h3>编辑玩家</h3><span id="playerEditorRole">PLAYER</span></div>
+        <form id="playerEditorForm" novalidate>
+          <section class="player-editor-section">
+            <div class="player-editor-section-head"><h4>账户资料</h4><p>公开注册固定为玩家身份</p></div>
+            <div class="player-editor-grid">
+              <div class="field"><label for="editPlayerUsername">用户名</label><input id="editPlayerUsername" name="username" type="text" minlength="3" maxlength="20" autocomplete="off" autocapitalize="none" spellcheck="false" /></div>
+              <div class="field"><label for="editPlayerDisplayName">昵称</label><input id="editPlayerDisplayName" name="displayName" type="text" maxlength="40" autocomplete="off" /></div>
+              <div class="field"><label for="editPlayerEmail">邮箱</label><input id="editPlayerEmail" name="email" type="email" maxlength="254" autocomplete="off" /></div>
+              <div class="field"><label for="editPlayerAvatar">头像</label><select id="editPlayerAvatar" name="avatar"></select></div>
+              <div class="field"><label for="editPlayerColor">主题色</label><select id="editPlayerColor" name="color"></select></div>
+              <div class="field"><label for="editPlayerPassword">重设密码 <em>选填</em></label><input id="editPlayerPassword" name="newPassword" type="password" minlength="4" maxlength="128" autocomplete="new-password" placeholder="留空则不修改" /><small>不会显示现有密码或密钥。</small></div>
+            </div>
+          </section>
+          <fieldset id="playerGameEditor">
+            <section class="player-editor-section">
+              <div class="player-editor-section-head"><h4>游戏进度</h4><p id="playerEditorGameHint">等级会按已刮票数自动计算</p></div>
+              <div class="player-editor-grid">
+                <div class="field"><label for="editPlayerCoins">代币余额</label><input id="editPlayerCoins" type="number" min="0" max="9007199254740991" step="1" inputmode="numeric" /></div>
+                <div class="field"><label for="editPlayerTickets">已刮票数</label><input id="editPlayerTickets" type="number" min="0" max="1000000000" step="1" inputmode="numeric" /></div>
+                <div class="field"><label for="editPlayerLevel">等级 <em>自动</em></label><input id="editPlayerLevel" type="number" min="1" readonly aria-readonly="true" /></div>
+                <div class="field"><label for="editPlayerWon">累计中奖</label><input id="editPlayerWon" type="number" min="0" max="9007199254740991" step="1" inputmode="numeric" /></div>
+                <div class="field"><label for="editPlayerSpent">累计购票花费</label><input id="editPlayerSpent" type="number" min="0" max="9007199254740991" step="1" inputmode="numeric" /></div>
+                <div class="field"><label for="editPlayerTicket">当前票种</label><select id="editPlayerTicket"></select></div>
+              </div>
+              <div class="player-editor-section-head"><h4>各票种最高中奖</h4><p>不会改变当前刮刮卡内容</p></div>
+              <div class="player-best-wins" id="playerBestWinsEditor"></div>
+              <div class="player-editor-checks">
+                <label><input id="editPlayerSound" type="checkbox" /> 音效</label>
+                <label><input id="editPlayerVibration" type="checkbox" /> 振动</label>
+                <label><input id="editPlayerTutorial" type="checkbox" /> 已完成新手提示</label>
+                <label><input id="editPlayerRescue" type="checkbox" /> 立即开放救济</label>
+                <label><input id="editPlayerClearHistory" type="checkbox" /> 清空交易与每日图表</label>
+              </div>
+            </section>
+          </fieldset>
+          <p class="player-editor-status" id="playerEditorStatus" role="status"></p>
+          <div class="player-editor-actions">
+            <div class="player-editor-danger">
+              <button class="btn" id="btnResetPlayer" type="button">重置进度</button>
+              <button class="btn btn-danger" id="btnDeletePlayer" type="button">删除玩家</button>
+            </div>
+            <button class="btn btn-primary player-editor-save" id="btnSavePlayer" type="submit">保存玩家</button>
+          </div>
+        </form>
+      </div>
       <div class="transaction-head"><h3>充值历史</h3><span>玩家充值</span></div>
       <div class="player-log" id="playerTopupLog"><div class="player-log-empty">尚未读取充值记录</div></div>
       <div class="transaction-head"><h3>交易流</h3><span>最近 80 笔</span></div>
@@ -1458,6 +1533,7 @@
 
 <div class="toast" id="toast"><i>✓</i><span id="toastMsg"></span></div>
 
+<script src="/player-admin.js"></script>
 <script src="/player-analytics.js"></script>
 <script>
 (function () {
@@ -1709,6 +1785,7 @@
       title: "玩家记录", sub: "查看当前浏览器里某个本地玩家的进度",
       body: [
         { h: "能看到什么", p: "输入用户名后可查看玩家名称、余额、输赢、充值历史与最近 80 笔交易流；作弊加币会标成<b>开发者试用</b>。" },
+        { h: "编辑玩家", p: "选中玩家后可修改账户资料、重设密码、余额、进度、累计数字、票种最高中奖与偏好，也可重置进度或删除普通玩家。" },
         { h: "数据在哪里", p: "玩家账号与进度目前只保存在同一浏览器的本地存储，所以这里只能读取<b>这台设备</b>玩过的玩家。不会读取或显示密码、哈希或安全字段。" },
         { warn: "这不是跨设备的正式玩家账本。若要查看所有真实玩家，必须把账号与交易记录迁移到受保护的云端数据库。" }
       ]
@@ -2236,12 +2313,11 @@
 
   var PLAYER_ACCOUNTS_KEY = "lucky_accounts_v1";
   var PLAYER_SAVE_PREFIX = "lucky_save_v1::";
+  var playerAdmin = window.LuckyPlayerAdmin;
   var playerAnalytics = window.LuckyManagerAnalytics;
+  var activePlayerUsername = null;
   function normalizePlayerUsername(value) {
-    var username = String(value || "").trim().toLowerCase();
-    if (!/^[a-z0-9_]{3,20}$/.test(username)) return null;
-    if (username === "__proto__" || username === "constructor" || username === "prototype") return null;
-    return username;
+    return playerAdmin.normalizeUsername(value);
   }
   function collectLocalPlayerSummaries() {
     var names = new Set();
@@ -2422,10 +2498,104 @@
     target.appendChild(row);
   }
   function setPlayerReportEmpty(message) {
+    activePlayerUsername = null;
     $("playerIdentity").hidden = true;
     $("playerStats").hidden = true;
+    $("playerEditor").hidden = true;
     setPlayerLogEmpty($("playerTopupLog"), message === "尚未读取玩家记录" ? "尚未读取充值记录" : message);
     setPlayerLogEmpty($("playerLog"), message);
+  }
+  function playerRole(account, username) {
+    return playerAdmin.roleFor(account, username);
+  }
+  function fillPlayerEditorOptions() {
+    var avatarSelect = $("editPlayerAvatar");
+    if (!avatarSelect.options.length) {
+      playerAdmin.AVATARS.forEach(function (avatar) {
+        var option = document.createElement("option");
+        option.value = avatar; option.textContent = avatar + " 头像";
+        avatarSelect.appendChild(option);
+      });
+    }
+    var colorSelect = $("editPlayerColor");
+    if (!colorSelect.options.length) {
+      playerAdmin.COLORS.forEach(function (color, index) {
+        var option = document.createElement("option");
+        option.value = color; option.textContent = "主题色 " + (index + 1) + " · " + color;
+        colorSelect.appendChild(option);
+      });
+    }
+    var ticketSelect = $("editPlayerTicket");
+    var selected = ticketSelect.value;
+    ticketSelect.innerHTML = "";
+    cfg.tiers.forEach(function (ticketType) {
+      var option = document.createElement("option");
+      option.value = ticketType.id; option.textContent = ticketType.name;
+      ticketSelect.appendChild(option);
+    });
+    if (cfg.tiers.some(function (ticketType) { return ticketType.id === selected; })) ticketSelect.value = selected;
+  }
+  function renderBestWinEditor(bestWins) {
+    var target = $("playerBestWinsEditor");
+    target.innerHTML = "";
+    cfg.tiers.forEach(function (ticketType) {
+      var row = document.createElement("div");
+      row.className = "player-best-win";
+      var label = document.createElement("label");
+      label.htmlFor = "editBestWin_" + ticketType.id;
+      label.textContent = ticketType.name;
+      var input = document.createElement("input");
+      input.id = "editBestWin_" + ticketType.id;
+      input.type = "number"; input.min = "0"; input.max = "9007199254740991"; input.step = "1";
+      input.dataset.ticketId = ticketType.id;
+      input.value = String(Math.max(0, Math.floor(safePlayerNumber(bestWins && bestWins[ticketType.id]))));
+      row.appendChild(label); row.appendChild(input); target.appendChild(row);
+    });
+  }
+  function syncPlayerEditorLevel() {
+    var tickets = Math.max(0, Math.floor(Number($("editPlayerTickets").value) || 0));
+    $("editPlayerLevel").value = String(Math.floor(tickets / 5) + 1);
+  }
+  function populatePlayerEditor(username, account, savedGame) {
+    fillPlayerEditorOptions();
+    var role = playerRole(account, username);
+    var player = savedGame && savedGame.player && typeof savedGame.player === "object" ? savedGame.player : null;
+    activePlayerUsername = username;
+    $("playerEditor").hidden = false;
+    $("playerEditorRole").textContent = role === "test" ? "TEST PLAYER" : "PLAYER";
+    $("editPlayerUsername").value = account && account.username ? account.username : username;
+    $("editPlayerUsername").disabled = role === "test";
+    $("editPlayerDisplayName").value = account && account.displayName ? account.displayName : username;
+    $("editPlayerEmail").value = account && account.email ? account.email : "";
+    $("editPlayerAvatar").value = account && playerAdmin.AVATARS.indexOf(account.avatar) >= 0 ? account.avatar : playerAdmin.AVATARS[0];
+    $("editPlayerColor").value = account && playerAdmin.COLORS.indexOf(account.color) >= 0 ? account.color : playerAdmin.COLORS[0];
+    $("editPlayerPassword").value = "";
+    ["editPlayerDisplayName", "editPlayerEmail", "editPlayerAvatar", "editPlayerColor"].forEach(function (id) {
+      $(id).disabled = !account;
+    });
+    $("editPlayerPassword").disabled = !account || role === "test";
+    $("editPlayerCoins").value = String(Math.floor(safePlayerNumber(player ? player.coins : account && account.coins)));
+    $("editPlayerTickets").value = String(Math.floor(safePlayerNumber(player && player.ticketsPlayed)));
+    syncPlayerEditorLevel();
+    $("editPlayerWon").value = String(Math.floor(safePlayerNumber(player && player.totalWon)));
+    $("editPlayerSpent").value = String(Math.floor(safePlayerNumber(player && player.totalSpent)));
+    var selectedTicketId = player && typeof player.selectedTicketId === "string" ? player.selectedTicketId : cfg.tiers[0].id;
+    $("editPlayerTicket").value = cfg.tiers.some(function (ticketType) { return ticketType.id === selectedTicketId; }) ? selectedTicketId : cfg.tiers[0].id;
+    $("editPlayerSound").checked = player && player.settings ? player.settings.sound !== false : true;
+    $("editPlayerVibration").checked = player && player.settings ? player.settings.vibration !== false : true;
+    $("editPlayerTutorial").checked = Boolean(player && player.tutorialSeen);
+    $("editPlayerRescue").checked = false;
+    $("editPlayerClearHistory").checked = false;
+    renderBestWinEditor(player && player.bestWins);
+    $("playerGameEditor").disabled = false;
+    ["editPlayerTickets", "editPlayerWon", "editPlayerSpent", "editPlayerTicket", "editPlayerSound", "editPlayerVibration", "editPlayerTutorial", "editPlayerRescue", "editPlayerClearHistory"].forEach(function (id) {
+      $(id).disabled = !player;
+    });
+    $("playerBestWinsEditor").querySelectorAll("input").forEach(function (input) { input.disabled = !player; });
+    $("playerEditorGameHint").textContent = player ? "等级会按已刮票数自动计算" : "这名玩家尚未开始游戏；账户资料与初始余额仍可编辑";
+    $("btnDeletePlayer").disabled = role === "test";
+    $("playerEditorStatus").textContent = "";
+    $("playerEditorStatus").classList.remove("is-error");
   }
   function renderPlayerReport() {
     var rawUsername = String($("playerLookup").value || "").trim();
@@ -2472,7 +2642,7 @@
     var net = won - spent;
     var displayName = account && typeof account.displayName === "string" ? account.displayName.trim() : "";
     var identityName = displayName || username;
-    var isTestPlayer = username === "testplayer";
+    var isTestPlayer = playerRole(account, username) === "test";
     $("playerIdentity").hidden = false;
     $("playerIdentityAvatar").textContent = Array.from(identityName)[0] || "P";
     $("playerDisplayName").textContent = identityName;
@@ -2488,6 +2658,7 @@
     $("playerNet").textContent = (net >= 0 ? "+" : "−") + playerAmountText(Math.abs(net));
     $("playerNet").style.color = net >= 0 ? "var(--ok)" : "var(--danger)";
     $("playerReportMeta").textContent = "数据仅来自当前浏览器，可被本机用户修改。";
+    populatePlayerEditor(username, account, savedGame);
 
     var log = player && Array.isArray(player.log) ? player.log.slice(0, 80) : [];
     $("playerLog").innerHTML = "";
@@ -2513,6 +2684,71 @@
   $("playerSearchForm").onsubmit = function (event) {
     event.preventDefault();
     renderPlayerReport();
+  };
+  $("editPlayerTickets").addEventListener("input", syncPlayerEditorLevel);
+  $("playerEditorForm").addEventListener("submit", async function (event) {
+    event.preventDefault();
+    if (!activePlayerUsername) return;
+    var status = $("playerEditorStatus");
+    status.textContent = ""; status.classList.remove("is-error");
+    var requestedUsername = String($("editPlayerUsername").value || "").trim();
+    var normalizedRequested = normalizePlayerUsername(requestedUsername);
+    if (normalizedRequested && normalizedRequested !== activePlayerUsername && !window.confirm("修改用户名会迁移这名玩家的本机存档，并让该玩家重新载入游戏。继续吗？")) return;
+    if ($("editPlayerClearHistory").checked && !window.confirm("确定清空这名玩家的交易记录和每日图表吗？累计中奖与花费不会自动归零。")) return;
+    var bestWins = {};
+    $("playerBestWinsEditor").querySelectorAll("input[data-ticket-id]").forEach(function (input) {
+      bestWins[input.dataset.ticketId] = Number(input.value);
+    });
+    var patch = {
+      username: requestedUsername,
+      displayName: $("editPlayerDisplayName").value,
+      email: $("editPlayerEmail").value,
+      avatar: $("editPlayerAvatar").value,
+      color: $("editPlayerColor").value,
+      newPassword: $("editPlayerPassword").value,
+      coins: Number($("editPlayerCoins").value),
+      ticketsPlayed: Number($("editPlayerTickets").value),
+      totalWon: Number($("editPlayerWon").value),
+      totalSpent: Number($("editPlayerSpent").value),
+      selectedTicketId: $("editPlayerTicket").value,
+      bestWins: bestWins,
+      sound: $("editPlayerSound").checked,
+      vibration: $("editPlayerVibration").checked,
+      tutorialSeen: $("editPlayerTutorial").checked,
+      rescueReady: $("editPlayerRescue").checked,
+      clearHistory: $("editPlayerClearHistory").checked
+    };
+    var button = $("btnSavePlayer");
+    button.disabled = true; button.textContent = "保存中…";
+    try {
+      var result = await playerAdmin.updatePlayer(activePlayerUsername, patch);
+      if (!result.ok) {
+        status.textContent = result.error; status.classList.add("is-error");
+        toast(result.error, "err");
+        return;
+      }
+      $("playerLookup").value = result.username;
+      activePlayerUsername = result.username;
+      renderPlayerReport();
+      toast("玩家资料已保存并应用", "ok");
+    } finally {
+      button.disabled = false; button.textContent = "保存玩家";
+    }
+  });
+  $("btnResetPlayer").onclick = function () {
+    if (!activePlayerUsername || !window.confirm("确定把这名玩家的游戏进度恢复为新账户状态吗？此操作无法撤销。")) return;
+    var result = playerAdmin.resetProgress(activePlayerUsername);
+    if (!result.ok) { toast(result.error, "err"); return; }
+    renderPlayerReport();
+    toast("玩家进度已重置", "ok");
+  };
+  $("btnDeletePlayer").onclick = function () {
+    if (!activePlayerUsername || !window.confirm("确定永久删除这名玩家及其本机存档吗？此操作无法撤销。")) return;
+    var result = playerAdmin.deletePlayer(activePlayerUsername);
+    if (!result.ok) { toast(result.error, "err"); return; }
+    $("playerLookup").value = "";
+    renderPlayerReport();
+    toast("玩家已删除", "ok");
   };
 
   function renderGauge() {

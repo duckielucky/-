@@ -29,6 +29,14 @@ test("summarises each player's lifetime winnings, spend, loss, and net", () => {
   );
 });
 
+test("labels public accounts as players and preserves the built-in test role", () => {
+  const publicPlayer = analytics.summarisePlayer("alice", { displayName: "Alice", role: "player" }, null);
+  const testPlayer = analytics.summarisePlayer("test", { displayName: "Test" }, null);
+
+  assert.equal(publicPlayer.role, "player");
+  assert.equal(testPlayer.role, "test");
+});
+
 test("groups daily winnings and ticket spend while ignoring top-ups and developer credits", () => {
   const players = [
     {

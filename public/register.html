@@ -16,6 +16,7 @@
     <div class="brand"><div class="mark">✦</div><b>LUCKY<i>·</i>SCRATCH</b></div>
     <div class="auth-head">
       <h1>注册账户</h1>
+      <p>所有访客均可注册玩家账户，无需邀请码。</p>
     </div>
 
     <div class="form-error" id="formError" role="alert"></div>
@@ -67,7 +68,7 @@
         </div>
       </div>
 
-      <button type="submit" class="btn btn-primary" id="submitBtn">注册</button>
+      <button type="submit" class="btn btn-primary" id="submitBtn">注册玩家账户</button>
     </form>
 
     <p class="auth-alt">已有账户？<a href="/login.html">登录</a></p>
@@ -181,7 +182,7 @@
       });
       if (!res.ok) {
         formError.textContent = res.error; formError.className = "form-error on";
-        submitBtn.disabled = false; submitBtn.textContent = "注册";
+        submitBtn.disabled = false; submitBtn.textContent = "注册玩家账户";
         return;
       }
       showToast("欢迎，" + res.account.displayName + "！", "ok");
@@ -189,7 +190,7 @@
     } catch (err) {
       formError.textContent = "注册失败，请稍后再试。";
       formError.className = "form-error on";
-      submitBtn.disabled = false; submitBtn.textContent = "注册";
+      submitBtn.disabled = false; submitBtn.textContent = "注册玩家账户";
     }
   });
 })();

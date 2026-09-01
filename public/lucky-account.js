@@ -87,7 +87,7 @@
   // ---- validation ----------------------------------------------------------
   var USERNAME_RE = /^[a-zA-Z0-9_]{3,20}$/;
   var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  var RESERVED_NAMES = ["__proto__", "constructor", "prototype", "hasownproperty", "admin", "root"];
+  var RESERVED_NAMES = ["__proto__", "constructor", "prototype", "hasownproperty", "admin", "root", "test", "testplayer"];
 
   function validateUsername(u) {
     if (!u) return "请输入用户名";
@@ -97,6 +97,7 @@
   }
   function validateEmail(e) {
     if (!e) return "请输入邮箱";
+    if (e.length > 254) return "邮箱过长";
     if (!EMAIL_RE.test(e)) return "邮箱格式不正确";
     return null;
   }
@@ -113,6 +114,7 @@
   function validatePassword(pw) {
     if (!pw) return "请设置密码";
     if (pw.length < 4) return "密码至少 4 位";
+    if (pw.length > 128) return "密码最多 128 位";
     return null;
   }
 
@@ -150,9 +152,12 @@
   // strip secrets before returning an account to page code
   function publicView(acc) {
     if (!acc) return null;
+    var normalized = String(acc.username || "").toLowerCase();
+    var role = acc.role === "test" || normalized === "test" || normalized === "testplayer" ? "test" : "player";
     return {
       username: acc.username, email: acc.email, displayName: acc.displayName,
-      avatar: acc.avatar, color: acc.color, coins: acc.coins, createdAt: acc.createdAt
+      avatar: acc.avatar, color: acc.color, coins: acc.coins, createdAt: acc.createdAt,
+      role: role
     };
   }
 
@@ -165,6 +170,9 @@
 
     var err = validateUsername(username) || validateEmail(email) || validatePassword(password);
     if (err) return { ok: false, error: err };
+    if (displayName.length > 40 || /[\u0000-\u001f\u007f]/.test(displayName)) {
+      return { ok: false, error: "昵称过长或含有无效字符（最多 40 字）" };
+    }
 
     var store = readStore();
     if (store[username.toLowerCase()]) return { ok: false, error: "该用户名已被占用" };
@@ -172,11 +180,17 @@
 
     var salt = randomHex(16);
     var hash = await derive(password, salt);
+    // Password hashing yields to the event loop. Merge into the latest store so
+    // simultaneous registrations and test-account seeding cannot overwrite one another.
+    store = readStore();
+    if (store[username.toLowerCase()]) return { ok: false, error: "该用户名已被占用" };
+    if (findByEmail(store, email)) return { ok: false, error: "该邮箱已被注册" };
     var now = new Date().toISOString();
     var acc = {
       username: username, email: email, displayName: displayName,
       avatar: AVATARS.indexOf(input.avatar) >= 0 ? input.avatar : AVATARS[0],
       color: COLORS.indexOf(input.color) >= 0 ? input.color : COLORS[0],
+      role: "player",
       salt: salt, hash: hash, iterations: PBKDF2_ITERATIONS,
       coins: START_COINS, createdAt: now, updatedAt: now
     };
@@ -244,6 +258,7 @@
     var store = readStore();
     var acc = store[s.u.toLowerCase()];
     if (!acc) return { ok: false, error: "未找到账户" };
+    if (publicView(acc).role === "test") return { ok: false, error: "内置测试玩家密码固定为 1111" };
 
     var check = await derive(currentPw || "", acc.salt);
     if (!safeEqual(check, acc.hash)) return { ok: false, error: "当前密码不正确" };
@@ -251,9 +266,16 @@
     if (pe) return { ok: false, error: pe };
 
     var salt = randomHex(16);
-    acc.salt = salt;
-    acc.hash = await derive(newPw, salt);
-    acc.updatedAt = new Date().toISOString();
+    var hash = await derive(newPw, salt);
+    store = readStore();
+    var latest = store[s.u.toLowerCase()];
+    if (!latest) return { ok: false, error: "未找到账户" };
+    if (publicView(latest).role === "test") return { ok: false, error: "内置测试玩家密码固定为 1111" };
+    if (latest.salt !== acc.salt || latest.hash !== acc.hash) return { ok: false, error: "密码已在其他页面更新，请重新登录" };
+    latest.salt = salt;
+    latest.hash = hash;
+    latest.iterations = PBKDF2_ITERATIONS;
+    latest.updatedAt = new Date().toISOString();
     if (!writeStore(store)) return { ok: false, error: STORAGE_ERR };
     return { ok: true };
   }
@@ -346,10 +368,13 @@
         if (store[TEST_USER]) return true;
         var salt = randomHex(16);
         var hash = await derive(TEST_PASS, salt);
+        store = readStore();
+        if (store[TEST_USER]) return true;
         var now = new Date().toISOString();
         store[TEST_USER] = {
           username: TEST_USER, email: "test@example.com", displayName: "Test",
           avatar: AVATARS[0], color: COLORS[0],
+          role: "test",
           salt: salt, hash: hash, iterations: PBKDF2_ITERATIONS,
           coins: START_COINS, createdAt: now, updatedAt: now
         };

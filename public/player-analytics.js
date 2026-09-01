@@ -63,9 +63,14 @@
       : "";
     var won = safeAmount(player && player.totalWon);
     var spent = safeAmount(player && player.totalSpent);
+    var normalizedUsername = String(username || "").toLowerCase();
+    var role = (account && account.role === "test") || normalizedUsername === "test" || normalizedUsername === "testplayer"
+      ? "test"
+      : "player";
     return {
       username: String(username || ""),
       displayName: displayName || String(username || ""),
+      role: role,
       balance: safeAmount(player ? player.coins : account && account.coins),
       tickets: Math.floor(safeAmount(player && player.ticketsPlayed)),
       level: Math.max(1, Math.floor(safeAmount(player && player.level) || 1)),

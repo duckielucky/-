@@ -331,6 +331,31 @@ function restoreDailyStats(value: unknown, log: LogEntry[] | undefined): DailySt
   }, {});
 }
 
+function localAccountStartingCoins(): number {
+  try {
+    const session = JSON.parse(localStorage.getItem(SESSION_KEY) || "null") as { u?: string } | null;
+    if (!session?.u) return DEFAULT_PLAYER.coins;
+    const accounts = JSON.parse(localStorage.getItem(ACCOUNTS_KEY) || "{}") as Record<string, { coins?: unknown }>;
+    const amount = Number(accounts[session.u.toLowerCase()]?.coins);
+    return Number.isSafeInteger(amount) && amount >= 0 ? amount : DEFAULT_PLAYER.coins;
+  } catch {
+    return DEFAULT_PLAYER.coins;
+  }
+}
+
+function initialPlayerFor(type: TicketType, purchasedAt: number): Player {
+  const startingCoins = localAccountStartingCoins();
+  const paid = Math.min(startingCoins, type.cost);
+  return {
+    ...DEFAULT_PLAYER,
+    coins: startingCoins - paid,
+    ticketsPlayed: 1,
+    totalSpent: paid,
+    dailyStats: addDailyPlayerStat({}, "spent", paid, purchasedAt),
+    log: [{ t: purchasedAt, k: "buy", a: paid, n: type.name }],
+  };
+}
+
 const formatCoins = (value: number) => new Intl.NumberFormat("en-US").format(value);
 const formatTokens = (coins: number, coinsPerToken: number) => new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(coins / coinsPerToken);
 const randomFrom = <T,>(items: T[]) => items[Math.floor(Math.random() * items.length)];
@@ -873,13 +898,13 @@ export default function Home() {
         } else {
           const first = buildTicket(startup.types[0], true, 1, startup.odds, startup.multiplierMinLevel);
           const purchasedAt = Date.now();
-          setPlayer({ ...DEFAULT_PLAYER, coins: DEFAULT_PLAYER.coins - startup.types[0].cost, ticketsPlayed: 1, totalSpent: startup.types[0].cost, dailyStats: addDailyPlayerStat({}, "spent", startup.types[0].cost, purchasedAt), log: [{ t: purchasedAt, k: "buy", a: startup.types[0].cost, n: startup.types[0].name }] });
+          setPlayer(initialPlayerFor(startup.types[0], purchasedAt));
           setTicket(first);
         }
       } catch {
         const first = buildTicket(startup.types[0], true, 1, startup.odds, startup.multiplierMinLevel);
         const purchasedAt = Date.now();
-        setPlayer({ ...DEFAULT_PLAYER, coins: DEFAULT_PLAYER.coins - startup.types[0].cost, ticketsPlayed: 1, totalSpent: startup.types[0].cost, dailyStats: addDailyPlayerStat({}, "spent", startup.types[0].cost, purchasedAt), log: [{ t: purchasedAt, k: "buy", a: startup.types[0].cost, n: startup.types[0].name }] });
+        setPlayer(initialPlayerFor(startup.types[0], purchasedAt));
         setTicket(first);
       }
       setHydrated(true);
@@ -945,8 +970,49 @@ export default function Home() {
 
   useEffect(() => {
     if (!hydrated) return;
-    localStorage.setItem(saveKeyRef.current, JSON.stringify({ player, ticket, saveVersion: 1 }));
+    localStorage.setItem(saveKeyRef.current, JSON.stringify({ player, ticket, saveVersion: 2, updatedAt: Date.now() }));
   }, [player, ticket, hydrated]);
+
+  // Manager edits are written in another same-origin tab. Apply those changes
+  // immediately so an open game cannot overwrite them with stale state.
+  useEffect(() => {
+    if (!hydrated) return;
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === saveKeyRef.current) {
+        if (!event.newValue) { window.location.reload(); return; }
+        try {
+          const parsed = JSON.parse(event.newValue) as { player?: Player; ticket?: Ticket | null };
+          if (!parsed.player) return;
+          const nextPlayer = {
+            ...DEFAULT_PLAYER,
+            ...parsed.player,
+            settings: { ...DEFAULT_PLAYER.settings, ...parsed.player.settings },
+            dailyStats: restoreDailyStats(parsed.player.dailyStats, parsed.player.log),
+          };
+          setPlayer(nextPlayer);
+          if (parsed.ticket !== undefined) setTicket(parsed.ticket);
+          settleLock.current = Boolean(parsed.ticket?.settled);
+          setShowResult(false);
+          setToast("运营后台已更新玩家资料");
+        } catch { /* ignore a damaged external edit */ }
+        return;
+      }
+      if (event.key === SESSION_KEY) {
+        if (gameSaveKey() !== saveKeyRef.current || !hasLocalAccountSession()) window.location.reload();
+        return;
+      }
+      if (event.key === ACCOUNTS_KEY) {
+        try {
+          const session = JSON.parse(localStorage.getItem(SESSION_KEY) || "null") as { u?: string } | null;
+          const accounts = JSON.parse(event.newValue || "{}") as Record<string, { avatar?: string }>;
+          const avatar = session?.u ? accounts[session.u.toLowerCase()]?.avatar : null;
+          if (avatar) setProfileAvatar(avatar);
+        } catch { /* ignore malformed external account data */ }
+      }
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, [hydrated]);
 
   useEffect(() => {
     if (!toast) return;
@@ -1089,7 +1155,7 @@ export default function Home() {
       }),
     };
     try {
-      localStorage.setItem(saveKeyRef.current, JSON.stringify({ player: nextPlayer, ticket, saveVersion: 1 }));
+      localStorage.setItem(saveKeyRef.current, JSON.stringify({ player: nextPlayer, ticket, saveVersion: 2, updatedAt: Date.now() }));
     } catch {
       setToast("演示充值失败：无法写入本机存档");
       return;
@@ -1107,7 +1173,7 @@ export default function Home() {
     setConfig(fresh);
     const first = buildTicket(fresh.types[0], true, 1, fresh.odds, fresh.multiplierMinLevel);
     const purchasedAt = Date.now();
-    setPlayer({ ...DEFAULT_PLAYER, coins: DEFAULT_PLAYER.coins - fresh.types[0].cost, ticketsPlayed: 1, totalSpent: fresh.types[0].cost, dailyStats: addDailyPlayerStat({}, "spent", fresh.types[0].cost, purchasedAt), log: [{ t: purchasedAt, k: "buy", a: fresh.types[0].cost, n: fresh.types[0].name }] });
+    setPlayer(initialPlayerFor(fresh.types[0], purchasedAt));
     setTicket(first); settleLock.current = false; setShowResult(false); setPanel(null); setToast("已重新开始");
   };
 

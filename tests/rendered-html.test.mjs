@@ -187,14 +187,17 @@ test("serves game bundles asset-first while keeping manager routes protected", a
 });
 
 test("ships the game systems and installable assets", async () => {
-  const [page, layout, styles, accountStyles, login, profile, manager, managerAnalytics, managerLoginPage, manifest, serviceWorker, packageJson, configApi] = await Promise.all([
+  const [page, layout, styles, accountStyles, accountLibrary, login, registration, profile, manager, playerAdmin, managerAnalytics, managerLoginPage, manifest, serviceWorker, packageJson, configApi] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
     readFile(new URL("../public/lucky-account.css", import.meta.url), "utf8"),
+    readFile(new URL("../public/lucky-account.js", import.meta.url), "utf8"),
     readFile(new URL("../public/login.html", import.meta.url), "utf8"),
+    readFile(new URL("../public/register.html", import.meta.url), "utf8"),
     readFile(new URL("../public/profile.html", import.meta.url), "utf8"),
     readFile(new URL("../public/manager.html", import.meta.url), "utf8"),
+    readFile(new URL("../public/player-admin.js", import.meta.url), "utf8"),
     readFile(new URL("../public/player-analytics.js", import.meta.url), "utf8"),
     readFile(new URL("../public/manager-login.html", import.meta.url), "utf8"),
     readFile(new URL("../public/manifest.webmanifest", import.meta.url), "utf8"),
@@ -225,6 +228,9 @@ test("ships the game systems and installable assets", async () => {
   assert.match(page, /setAttribute\("inert", ""\)/);
   assert.match(page, /topupConfirmRef/);
   assert.match(page, /BroadcastChannel/);
+  assert.match(page, /function initialPlayerFor\(/);
+  assert.match(page, /window\.addEventListener\("storage", onStorage\)/);
+  assert.match(page, /运营后台已更新玩家资料/);
   assert.match(page, /result-particles/);
   assert.match(page, /WinConfetti.*intensity/s);
   assert.match(styles, /--effect-power/);
@@ -262,6 +268,12 @@ test("ships the game systems and installable assets", async () => {
   assert.match(accountStyles, /lottery-background\.webp/);
   assert.match(accountStyles, /profile-lottery-background\.webp/);
   assert.match(login, /id="loginForm"/);
+  assert.match(login, /注册玩家账户/);
+  assert.match(registration, /所有访客均可注册玩家账户，无需邀请码/);
+  assert.match(registration, /id="submitBtn">注册玩家账户</);
+  assert.match(accountLibrary, /role:\s*"player"/);
+  assert.match(accountLibrary, /role:\s*"test"/);
+  assert.match(accountLibrary, /"test", "testplayer"/);
   assert.match(profile, /class="auth-shell profile-shell"/);
   assert.match(manager, /id="btnLogout"/);
   assert.match(manager, /id="btnChangePw"/);
@@ -279,6 +291,22 @@ test("ships the game systems and installable assets", async () => {
   assert.match(manager, /id="playerTopupLog"/);
   assert.match(manager, /充值历史/);
   assert.match(manager, /id="playerLog"/);
+  assert.match(manager, /src="\/player-admin\.js"/);
+  assert.match(manager, /id="playerEditorForm"/);
+  assert.match(manager, /id="editPlayerUsername"/);
+  assert.match(manager, /id="editPlayerPassword"/);
+  assert.match(manager, /id="editPlayerCoins"/);
+  assert.match(manager, /id="playerBestWinsEditor"/);
+  assert.match(manager, /id="btnSavePlayer"/);
+  assert.match(manager, /id="btnResetPlayer"/);
+  assert.match(manager, /id="btnDeletePlayer"/);
+  assert.match(manager, /playerAdmin\.updatePlayer/);
+  assert.match(manager, /playerAdmin\.resetProgress/);
+  assert.match(manager, /playerAdmin\.deletePlayer/);
+  assert.match(playerAdmin, /root\.LuckyPlayerAdmin/);
+  assert.match(playerAdmin, /async function updatePlayer/);
+  assert.match(playerAdmin, /function resetProgress/);
+  assert.match(playerAdmin, /function deletePlayer/);
   assert.match(manager, /id="playerOverviewCount"/);
   assert.match(manager, /id="overviewTotalWon"/);
   assert.match(manager, /id="overviewTotalSpent"/);
@@ -337,7 +365,7 @@ test("ships the game systems and installable assets", async () => {
   assert.match(page, /dailyStats: addDailyPlayerStat\(current\.dailyStats, "won"/);
   assert.match(page, /dailyStats: addDailyPlayerStat\(current\.dailyStats, "spent"/);
   assert.match(manager, /var detailParts = \[label\]/);
-  assert.match(manager, /username === "testplayer"/);
+  assert.match(manager, /playerAdmin\.roleFor\(account, username\)/);
   assert.match(manager, /isTestPlayer \? "测试玩家" : "玩家"/);
   assert.match(manager, /var topups = log\.filter\(function \(entry\) \{\s*return entry && typeof entry === "object" && entry\.k === "topup";/);
   assert.match(manager, /appendPlayerLogRow\(\$\("playerTopupLog"\), entry, PLAYER_LOG_LABELS\.topup\)/);
