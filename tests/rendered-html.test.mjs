@@ -187,7 +187,7 @@ test("serves game bundles asset-first while keeping manager routes protected", a
 });
 
 test("ships the game systems and installable assets", async () => {
-  const [page, layout, styles, accountStyles, login, profile, manager, managerLoginPage, manifest, serviceWorker, packageJson, configApi] = await Promise.all([
+  const [page, layout, styles, accountStyles, login, profile, manager, managerAnalytics, managerLoginPage, manifest, serviceWorker, packageJson, configApi] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
@@ -195,6 +195,7 @@ test("ships the game systems and installable assets", async () => {
     readFile(new URL("../public/login.html", import.meta.url), "utf8"),
     readFile(new URL("../public/profile.html", import.meta.url), "utf8"),
     readFile(new URL("../public/manager.html", import.meta.url), "utf8"),
+    readFile(new URL("../public/player-analytics.js", import.meta.url), "utf8"),
     readFile(new URL("../public/manager-login.html", import.meta.url), "utf8"),
     readFile(new URL("../public/manifest.webmanifest", import.meta.url), "utf8"),
     readFile(new URL("../public/sw.js", import.meta.url), "utf8"),
@@ -278,6 +279,15 @@ test("ships the game systems and installable assets", async () => {
   assert.match(manager, /id="playerTopupLog"/);
   assert.match(manager, /充值历史/);
   assert.match(manager, /id="playerLog"/);
+  assert.match(manager, /id="playerOverviewCount"/);
+  assert.match(manager, /id="overviewTotalWon"/);
+  assert.match(manager, /id="overviewTotalSpent"/);
+  assert.match(manager, /id="overviewHouseNet"/);
+  assert.match(manager, /id="playerOverviewBody"/);
+  assert.match(manager, /id="playerDailyChart"[^>]*role="img"/);
+  assert.match(manager, /每日中奖与花费/);
+  assert.match(manager, /<th>玩家<\/th><th>累计中奖<\/th><th>累计花费<\/th><th>净输赢<\/th>/);
+  assert.match(manager, /src="\/player-analytics\.js"/);
   assert.match(manager, /id="playerSearchForm"[^>]*role="search"/);
   assert.match(manager, /id="playerNameOptions"/);
   assert.match(manager, /仅此浏览器/);
@@ -316,6 +326,16 @@ test("ships the game systems and installable assets", async () => {
   assert.equal((manager.match(/保存所有未发布更改/g) ?? []).length, 2);
   assert.match(manager, /if \(normalizePlayerUsername\(\$\("playerLookup"\)\.value\)\) renderPlayerReport\(\)/);
   assert.match(manager, /PLAYER_SAVE_PREFIX \+ username/);
+  assert.match(manager, /function collectLocalPlayerSummaries\(/);
+  assert.match(manager, /function renderPlayerOverview\(/);
+  assert.match(manager, /aggregateDailyPlayerActivity\(scope, \{ dayCount: 7/);
+  assert.match(managerAnalytics, /entry\.k !== "win" && entry\.k !== "buy"/);
+  assert.match(managerAnalytics, /Asia\/Kuala_Lumpur/);
+  assert.match(managerAnalytics, /normaliseDailyStats/);
+  assert.match(page, /dailyStats: DailyStats/);
+  assert.match(page, /function addDailyPlayerStat\(/);
+  assert.match(page, /dailyStats: addDailyPlayerStat\(current\.dailyStats, "won"/);
+  assert.match(page, /dailyStats: addDailyPlayerStat\(current\.dailyStats, "spent"/);
   assert.match(manager, /var detailParts = \[label\]/);
   assert.match(manager, /username === "testplayer"/);
   assert.match(manager, /isTestPlayer \? "测试玩家" : "玩家"/);

@@ -388,6 +388,35 @@
   .player-log-row span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .player-log-row b{font-family:var(--mono);white-space:nowrap}
   .player-log-empty{padding:20px;border:1px dashed var(--line-strong);border-radius:10px;color:var(--dim);font-size:12px;text-align:center}
+  .player-overview-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;margin-top:14px;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--line)}
+  .player-overview-kpis div{display:grid;gap:5px;padding:13px;background:#100716}
+  .player-overview-kpis span{color:var(--dim);font-size:10px}
+  .player-overview-kpis b{font-family:var(--mono);font-size:16px;overflow-wrap:anywhere}
+  .player-overview-grid{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(320px,.92fr);gap:14px;margin-top:14px}
+  .player-overview-panel{min-width:0;padding:14px;border:1px solid var(--line);border-radius:14px;background:#100716}
+  .player-overview-panel-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px}
+  .player-overview-panel-head h3{margin:0;font-size:13px;color:var(--ink)}
+  .player-overview-panel-head span{color:var(--dim);font-family:var(--mono);font-size:10px;text-align:right}
+  .player-overview-table-wrap,.player-chart-scroll{overflow:auto;scrollbar-width:thin}
+  .player-overview-table{width:100%;min-width:520px;border-collapse:collapse;font-size:11px}
+  .player-overview-table th{padding:0 9px 9px;color:var(--dim);font-size:9px;font-weight:700;text-align:right;white-space:nowrap}
+  .player-overview-table th:first-child,.player-overview-table td:first-child{text-align:left}
+  .player-overview-table td{padding:10px 9px;border-top:1px solid var(--line);font-family:var(--mono);text-align:right;white-space:nowrap}
+  .player-overview-table tr:first-child td{border-top:0}
+  .player-overview-open{max-width:160px;padding:0;border:0;background:transparent;color:var(--ink);font-family:var(--font);font-size:11px;font-weight:700;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .player-overview-open:hover,.player-overview-open:focus-visible{color:var(--cyan);outline:0;text-decoration:underline;text-underline-offset:3px}
+  .player-overview-open small{display:block;color:var(--dim);font-family:var(--mono);font-size:9px;font-weight:500;overflow:hidden;text-overflow:ellipsis}
+  .player-overview-empty{padding:24px 10px;color:var(--dim);font-size:11px;text-align:center}
+  .player-chart-legend{display:flex;gap:14px;align-items:center;margin-bottom:9px;color:var(--muted);font-size:10px}
+  .player-chart-legend span{display:inline-flex;align-items:center;gap:6px}
+  .player-chart-legend i{width:8px;height:8px;border-radius:3px;background:var(--ok);box-shadow:0 0 10px color-mix(in srgb,var(--ok) 45%,transparent)}
+  .player-chart-legend span:last-child i{background:var(--danger);box-shadow:0 0 10px color-mix(in srgb,var(--danger) 45%,transparent)}
+  .player-daily-chart{position:relative;display:grid;grid-template-columns:repeat(7,minmax(54px,1fr));gap:7px;min-width:440px;height:190px;padding:12px 6px 0;border-radius:10px;background:repeating-linear-gradient(to bottom,#ffffff0b 0,#ffffff0b 1px,transparent 1px,transparent 25%)}
+  .player-chart-day{display:grid;grid-template-rows:minmax(0,1fr) auto;gap:8px;min-width:0}
+  .player-chart-bars{height:148px;display:flex;align-items:flex-end;justify-content:center;gap:4px}
+  .player-chart-bar{width:min(15px,36%);min-height:2px;border-radius:5px 5px 2px 2px;background:linear-gradient(180deg,#a7f3d7,var(--ok));box-shadow:0 0 14px color-mix(in srgb,var(--ok) 30%,transparent);transition:height .35s ease}
+  .player-chart-bar.is-spent{background:linear-gradient(180deg,#ff9eaf,var(--danger));box-shadow:0 0 14px color-mix(in srgb,var(--danger) 30%,transparent)}
+  .player-chart-day>span{color:var(--dim);font-family:var(--mono);font-size:9px;text-align:center;white-space:nowrap}
   .btn:disabled{opacity:.45;cursor:not-allowed}
   @media (max-width:620px){
     .topup-row{grid-template-columns:32px 1fr auto}
@@ -397,7 +426,10 @@
     .player-identity-avatar{width:38px;height:38px}
     .player-log-row{grid-template-columns:74px minmax(0,1fr);gap:7px}
     .player-log-row b{grid-column:2}
+    .player-overview-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .player-overview-grid{grid-template-columns:1fr}
   }
+  @media (max-width:980px){.player-overview-grid{grid-template-columns:1fr}}
 
   /* ---------- odds ---------- */
   .odds-row{display:grid;gap:10px;grid-template-columns:repeat(4,1fr)}
@@ -1208,10 +1240,43 @@
       <button class="btn btn-primary" type="button" data-save-config="topups" disabled>保存并应用</button>
     </div>
 
+    <!-- 同一浏览器上的玩家盈亏概览 -->
+    <section class="card sec" data-manager-section="players" hidden>
+      <div class="sec-head">
+        <h2>玩家盈亏概览</h2>
+        <span class="tag" id="playerOverviewCount">0 名玩家</span>
+        <button class="info" type="button" data-help="playerOverview" aria-label="玩家盈亏概览怎么用">i</button>
+      </div>
+      <div class="player-overview-kpis">
+        <div><span>玩家数量</span><b id="overviewPlayerCount">0</b></div>
+        <div><span>累计中奖</span><b id="overviewTotalWon">0 代币</b></div>
+        <div><span>累计购票花费</span><b id="overviewTotalSpent">0 代币</b></div>
+        <div><span>平台净额</span><b id="overviewHouseNet">0 代币</b></div>
+      </div>
+      <div class="player-overview-grid">
+        <div class="player-overview-panel">
+          <div class="player-overview-panel-head"><h3>每位玩家</h3><span>点击玩家查看明细</span></div>
+          <div class="player-overview-table-wrap">
+            <table class="player-overview-table">
+              <thead><tr><th>玩家</th><th>累计中奖</th><th>累计花费</th><th>净输赢</th></tr></thead>
+              <tbody id="playerOverviewBody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="player-overview-panel">
+          <div class="player-overview-panel-head"><h3>每日中奖与花费</h3><span id="playerChartScope">全部玩家 · 最近 7 天</span></div>
+          <div class="player-chart-legend" aria-hidden="true"><span><i></i>每日中奖</span><span><i></i>每日购票花费</span></div>
+          <div class="player-chart-scroll">
+            <div class="player-daily-chart" id="playerDailyChart" role="img" aria-label="全部玩家最近七天每日中奖与购票花费"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- 同一浏览器上的玩家记录 -->
     <section class="card sec" data-manager-section="players" hidden>
       <div class="sec-head">
-        <h2>玩家记录</h2>
+        <h2 id="playerDetailHeading">玩家明细</h2>
         <span class="tag">仅此浏览器</span>
         <button class="info" type="button" data-help="player" aria-label="玩家记录怎么用">i</button>
       </div>
@@ -1393,6 +1458,7 @@
 
 <div class="toast" id="toast"><i>✓</i><span id="toastMsg"></span></div>
 
+<script src="/player-analytics.js"></script>
 <script>
 (function () {
   "use strict";
@@ -1645,6 +1711,14 @@
         { h: "能看到什么", p: "输入用户名后可查看玩家名称、余额、输赢、充值历史与最近 80 笔交易流；作弊加币会标成<b>开发者试用</b>。" },
         { h: "数据在哪里", p: "玩家账号与进度目前只保存在同一浏览器的本地存储，所以这里只能读取<b>这台设备</b>玩过的玩家。不会读取或显示密码、哈希或安全字段。" },
         { warn: "这不是跨设备的正式玩家账本。若要查看所有真实玩家，必须把账号与交易记录迁移到受保护的云端数据库。" }
+      ]
+    },
+    playerOverview: {
+      title: "玩家盈亏概览", sub: "同一浏览器里的玩家表现",
+      body: [
+        { h: "累计数字", p: "<b>累计中奖</b>与<b>累计购票花费</b>来自每名玩家的游戏存档；净输赢 = 中奖 − 花费。平台净额从运营角度计算为花费 − 中奖。" },
+        { h: "每日图表", p: "绿色是每日中奖，红色是每日购票花费。充值、救济和<b>开发者试用</b>不会计入游戏盈亏。" },
+        { warn: "概览只包含当前浏览器保存的玩家，不代表其他设备上的玩家数据。" }
       ]
     },
     rtp: {
@@ -2162,17 +2236,20 @@
 
   var PLAYER_ACCOUNTS_KEY = "lucky_accounts_v1";
   var PLAYER_SAVE_PREFIX = "lucky_save_v1::";
+  var playerAnalytics = window.LuckyManagerAnalytics;
   function normalizePlayerUsername(value) {
     var username = String(value || "").trim().toLowerCase();
     if (!/^[a-z0-9_]{3,20}$/.test(username)) return null;
     if (username === "__proto__" || username === "constructor" || username === "prototype") return null;
     return username;
   }
-  function refreshPlayerOptions() {
+  function collectLocalPlayerSummaries() {
     var names = new Set();
+    var accounts = {};
     try {
       var parsedAccounts = JSON.parse(localStorage.getItem(PLAYER_ACCOUNTS_KEY) || "{}");
       if (parsedAccounts && typeof parsedAccounts === "object" && !Array.isArray(parsedAccounts)) {
+        accounts = parsedAccounts;
         Object.keys(parsedAccounts).forEach(function (key) {
           var username = normalizePlayerUsername(key);
           if (username) names.add(username);
@@ -2185,20 +2262,125 @@
         if (savedUsername) names.add(savedUsername);
       }
     } catch (e) { /* local storage may be unavailable */ }
+    return Array.from(names).sort().map(function (username) {
+      var savedGame = null;
+      try {
+        var rawSave = localStorage.getItem(PLAYER_SAVE_PREFIX + username);
+        savedGame = rawSave ? JSON.parse(rawSave) : null;
+      } catch (e) { /* skip a damaged save while retaining the account row */ }
+      var account = Object.prototype.hasOwnProperty.call(accounts, username) ? accounts[username] : null;
+      return playerAnalytics.summarisePlayer(username, account, savedGame);
+    }).sort(function (a, b) {
+      return b.spent - a.spent || b.won - a.won || a.username.localeCompare(b.username);
+    });
+  }
+  function refreshPlayerOptions(players) {
     var options = $("playerNameOptions");
     options.innerHTML = "";
-    Array.from(names).sort().forEach(function (username) {
+    (players || collectLocalPlayerSummaries()).forEach(function (player) {
       var option = document.createElement("option");
-      option.value = username;
+      option.value = player.username;
       options.appendChild(option);
     });
   }
   function safePlayerNumber(value) {
-    var number = Number(value);
-    return isFinite(number) && number >= 0 ? number : 0;
+    return playerAnalytics.safeAmount(value);
   }
   function playerAmountText(coins) {
     return tokenText(coins) + " · " + myrText(coins);
+  }
+  function signedPlayerAmountText(coins) {
+    var amount = Number(coins) || 0;
+    return (amount >= 0 ? "+" : "−") + tokenText(Math.abs(amount));
+  }
+  function renderPlayerDailyChart(players, selectedUsername) {
+    var selected = selectedUsername && players.find(function (player) { return player.username === selectedUsername; });
+    var scope = selected ? [selected] : players;
+    var scopeLabel = selected ? selected.displayName : "全部玩家";
+    var days = playerAnalytics.aggregateDailyPlayerActivity(scope, { dayCount: 7, now: Date.now() });
+    var maxValue = days.reduce(function (maximum, day) { return Math.max(maximum, day.won, day.spent); }, 0);
+    var chart = $("playerDailyChart");
+    chart.innerHTML = "";
+    days.forEach(function (day) {
+      var group = document.createElement("div");
+      group.className = "player-chart-day";
+      var bars = document.createElement("div");
+      bars.className = "player-chart-bars";
+      var won = document.createElement("i");
+      won.className = "player-chart-bar";
+      won.style.height = day.won > 0 && maxValue > 0 ? Math.max(4, day.won / maxValue * 100) + "%" : "2px";
+      won.title = day.label + " 中奖 " + tokenText(day.won);
+      var spent = document.createElement("i");
+      spent.className = "player-chart-bar is-spent";
+      spent.style.height = day.spent > 0 && maxValue > 0 ? Math.max(4, day.spent / maxValue * 100) + "%" : "2px";
+      spent.title = day.label + " 花费 " + tokenText(day.spent);
+      var label = document.createElement("span");
+      label.textContent = day.label;
+      bars.appendChild(won); bars.appendChild(spent);
+      group.appendChild(bars); group.appendChild(label);
+      chart.appendChild(group);
+    });
+    $("playerChartScope").textContent = scopeLabel + " · 最近 7 天";
+    chart.setAttribute("aria-label", scopeLabel + "最近七天每日中奖与购票花费：" + days.map(function (day) {
+      return day.label + "中奖" + tokenText(day.won) + "、花费" + tokenText(day.spent);
+    }).join("；"));
+  }
+  function openPlayerFromOverview(username) {
+    $("playerLookup").value = username;
+    renderPlayerReport();
+    var heading = $("playerDetailHeading");
+    if (heading && heading.scrollIntoView) heading.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+  function renderPlayerOverview(selectedUsername) {
+    var players = collectLocalPlayerSummaries();
+    refreshPlayerOptions(players);
+    var totals = players.reduce(function (summary, player) {
+      summary.won += player.won;
+      summary.spent += player.spent;
+      return summary;
+    }, { won: 0, spent: 0 });
+    var houseNet = totals.spent - totals.won;
+    $("playerOverviewCount").textContent = players.length + " 名玩家";
+    $("overviewPlayerCount").textContent = num(players.length);
+    $("overviewTotalWon").textContent = tokenText(totals.won);
+    $("overviewTotalSpent").textContent = tokenText(totals.spent);
+    $("overviewHouseNet").textContent = signedPlayerAmountText(houseNet);
+    $("overviewHouseNet").style.color = houseNet >= 0 ? "var(--ok)" : "var(--danger)";
+
+    var body = $("playerOverviewBody");
+    body.innerHTML = "";
+    if (!players.length) {
+      var emptyRow = document.createElement("tr");
+      var emptyCell = document.createElement("td");
+      emptyCell.colSpan = 4;
+      emptyCell.innerHTML = '<div class="player-overview-empty">当前浏览器还没有玩家记录</div>';
+      emptyRow.appendChild(emptyCell);
+      body.appendChild(emptyRow);
+    } else {
+      players.forEach(function (player) {
+        var row = document.createElement("tr");
+        var identity = document.createElement("td");
+        var open = document.createElement("button");
+        open.type = "button";
+        open.className = "player-overview-open";
+        open.textContent = player.displayName;
+        var username = document.createElement("small");
+        username.textContent = "@" + player.username;
+        open.appendChild(username);
+        open.onclick = function () { openPlayerFromOverview(player.username); };
+        identity.appendChild(open);
+        var won = document.createElement("td");
+        won.textContent = tokenText(player.won);
+        var spent = document.createElement("td");
+        spent.textContent = tokenText(player.spent);
+        var net = document.createElement("td");
+        net.textContent = signedPlayerAmountText(player.net);
+        net.style.color = player.net >= 0 ? "var(--ok)" : "var(--danger)";
+        row.appendChild(identity); row.appendChild(won); row.appendChild(spent); row.appendChild(net);
+        body.appendChild(row);
+      });
+    }
+    renderPlayerDailyChart(players, normalizePlayerUsername(selectedUsername));
   }
   var PLAYER_LOG_LABELS = { buy: "购票", win: "中奖", daily: "旧版每日奖励", rescue: "救济", topup: "玩家充值（演示）", developer: "开发者试用" };
   function setPlayerLogEmpty(target, message) {
@@ -2250,12 +2432,14 @@
     if (!rawUsername) {
       $("playerReportMeta").textContent = "搜索本浏览器保存的玩家记录。不会显示密码或安全资料。";
       setPlayerReportEmpty("尚未读取玩家记录");
+      renderPlayerOverview();
       return;
     }
     var username = normalizePlayerUsername(rawUsername);
     if (!username) {
       $("playerReportMeta").textContent = "请输入 3–20 位、只含字母数字或下划线的玩家用户名。";
       setPlayerReportEmpty("用户名格式无效");
+      renderPlayerOverview();
       return;
     }
     var accounts;
@@ -2268,6 +2452,7 @@
     } catch (e) {
       $("playerReportMeta").textContent = "本浏览器里的玩家记录无法读取或已经损坏。";
       setPlayerReportEmpty("无法解析本地玩家记录");
+      renderPlayerOverview();
       return;
     }
     var account = Object.prototype.hasOwnProperty.call(accounts, username) ? accounts[username] : null;
@@ -2275,6 +2460,7 @@
     if (!account && !player) {
       $("playerReportMeta").textContent = "本浏览器没有找到玩家「" + username + "」。请先在这台设备登录并玩一局。";
       setPlayerReportEmpty("没有本机玩家数据");
+      renderPlayerOverview();
       return;
     }
 
@@ -2321,6 +2507,7 @@
       appendPlayerLogRow($("playerTopupLog"), entry, PLAYER_LOG_LABELS.topup);
     });
     if (!topups.length) setPlayerLogEmpty($("playerTopupLog"), "这名玩家还没有充值记录");
+    renderPlayerOverview(username);
   }
 
   $("playerSearchForm").onsubmit = function (event) {
@@ -2974,6 +3161,7 @@
     renderOverview();
     renderDirty();
     if (normalizePlayerUsername($("playerLookup").value)) renderPlayerReport();
+    else renderPlayerOverview();
   }
 
   var managerStarted = false;
@@ -3042,8 +3230,10 @@
   });
   window.addEventListener("storage", function (event) {
     var username = normalizePlayerUsername($("playerLookup").value);
-    if (event.key === PLAYER_ACCOUNTS_KEY || (event.key && event.key.indexOf(PLAYER_SAVE_PREFIX) === 0)) refreshPlayerOptions();
-    if (username && (event.key === PLAYER_ACCOUNTS_KEY || event.key === PLAYER_SAVE_PREFIX + username)) renderPlayerReport();
+    var playerDataChanged = event.key === PLAYER_ACCOUNTS_KEY || (event.key && event.key.indexOf(PLAYER_SAVE_PREFIX) === 0);
+    if (!playerDataChanged) return;
+    if (username) renderPlayerReport();
+    else renderPlayerOverview();
   });
   void startManager();
 })();

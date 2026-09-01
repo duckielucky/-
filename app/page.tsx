@@ -48,6 +48,8 @@ type LogEntry = {
   packageId?: string;
   priceMyr?: number;
 };
+type DailyActivity = { won: number; spent: number };
+type DailyStats = Record<string, DailyActivity>;
 type Player = {
   coins: number;
   level: number;
@@ -60,6 +62,7 @@ type Player = {
   settings: { sound: boolean; vibration: boolean };
   totalSpent: number;
   totalWon: number;
+  dailyStats: DailyStats;
   log: LogEntry[];
 };
 
@@ -274,11 +277,59 @@ const DEFAULT_PLAYER: Player = {
   settings: { sound: true, vibration: true },
   totalSpent: 0,
   totalWon: 0,
+  dailyStats: {},
   log: [],
 };
 
 const LOG_MAX = 80;
 const pushLog = (log: LogEntry[], entry: LogEntry): LogEntry[] => [entry, ...(Array.isArray(log) ? log : [])].slice(0, LOG_MAX);
+const MALAYSIA_DAY_FORMATTER = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Asia/Kuala_Lumpur",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+function malaysiaDayKey(timestamp = Date.now()): string {
+  const values = Object.fromEntries(
+    MALAYSIA_DAY_FORMATTER.formatToParts(new Date(timestamp))
+      .filter((part) => part.type !== "literal")
+      .map((part) => [part.type, part.value]),
+  );
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
+function addDailyPlayerStat(current: DailyStats | undefined, field: keyof DailyActivity, amount: number, timestamp: number): DailyStats {
+  if (!Number.isFinite(amount) || amount <= 0) return current || {};
+  const key = malaysiaDayKey(timestamp);
+  const existing = current?.[key] || { won: 0, spent: 0 };
+  return { ...current, [key]: { ...existing, [field]: existing[field] + amount } };
+}
+
+function restoreDailyStats(value: unknown, log: LogEntry[] | undefined): DailyStats {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    const restored = Object.entries(value).reduce<DailyStats>((days, [key, entry]) => {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(key) || !entry || typeof entry !== "object") return days;
+      const candidate = entry as Partial<DailyActivity>;
+      const won = Number(candidate.won);
+      const spent = Number(candidate.spent);
+      days[key] = {
+        won: Number.isFinite(won) && won >= 0 ? won : 0,
+        spent: Number.isFinite(spent) && spent >= 0 ? spent : 0,
+      };
+      return days;
+    }, {});
+    if (Object.keys(restored).length) return restored;
+  }
+
+  return (Array.isArray(log) ? log : []).reduce<DailyStats>((days, entry) => {
+    if (entry?.k !== "win" && entry?.k !== "buy") return days;
+    const amount = Number(entry.a);
+    if (!Number.isFinite(amount) || amount <= 0 || !Number.isFinite(Number(entry.t))) return days;
+    const field = entry.k === "win" ? "won" : "spent";
+    return addDailyPlayerStat(days, field, amount, Number(entry.t));
+  }, {});
+}
 
 const formatCoins = (value: number) => new Intl.NumberFormat("en-US").format(value);
 const formatTokens = (coins: number, coinsPerToken: number) => new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(coins / coinsPerToken);
@@ -802,7 +853,12 @@ export default function Home() {
         const saved = localStorage.getItem(saveKey);
         if (saved) {
           const parsed = JSON.parse(saved) as { player: Player; ticket: Ticket | null };
-          const mergedPlayer = { ...DEFAULT_PLAYER, ...parsed.player, settings: { ...DEFAULT_PLAYER.settings, ...parsed.player?.settings } };
+          const mergedPlayer = {
+            ...DEFAULT_PLAYER,
+            ...parsed.player,
+            settings: { ...DEFAULT_PLAYER.settings, ...parsed.player?.settings },
+            dailyStats: restoreDailyStats(parsed.player?.dailyStats, parsed.player?.log),
+          };
           const legacyType = startup.types.find((type) => type.id === parsed.ticket?.typeId) || startup.types[0];
           const restoredTicket = parsed.ticket
             ? { ...parsed.ticket, typeSnapshot: parsed.ticket.typeSnapshot || { ...legacyType, prizePool: [...legacyType.prizePool], multipliers: [...legacyType.multipliers] } }
@@ -816,12 +872,14 @@ export default function Home() {
           setShowResult(false);
         } else {
           const first = buildTicket(startup.types[0], true, 1, startup.odds, startup.multiplierMinLevel);
-          setPlayer({ ...DEFAULT_PLAYER, coins: DEFAULT_PLAYER.coins - startup.types[0].cost, ticketsPlayed: 1, totalSpent: startup.types[0].cost, log: [{ t: Date.now(), k: "buy", a: startup.types[0].cost, n: startup.types[0].name }] });
+          const purchasedAt = Date.now();
+          setPlayer({ ...DEFAULT_PLAYER, coins: DEFAULT_PLAYER.coins - startup.types[0].cost, ticketsPlayed: 1, totalSpent: startup.types[0].cost, dailyStats: addDailyPlayerStat({}, "spent", startup.types[0].cost, purchasedAt), log: [{ t: purchasedAt, k: "buy", a: startup.types[0].cost, n: startup.types[0].name }] });
           setTicket(first);
         }
       } catch {
         const first = buildTicket(startup.types[0], true, 1, startup.odds, startup.multiplierMinLevel);
-        setPlayer({ ...DEFAULT_PLAYER, coins: DEFAULT_PLAYER.coins - startup.types[0].cost, ticketsPlayed: 1, totalSpent: startup.types[0].cost, log: [{ t: Date.now(), k: "buy", a: startup.types[0].cost, n: startup.types[0].name }] });
+        const purchasedAt = Date.now();
+        setPlayer({ ...DEFAULT_PLAYER, coins: DEFAULT_PLAYER.coins - startup.types[0].cost, ticketsPlayed: 1, totalSpent: startup.types[0].cost, dailyStats: addDailyPlayerStat({}, "spent", startup.types[0].cost, purchasedAt), log: [{ t: purchasedAt, k: "buy", a: startup.types[0].cost, n: startup.types[0].name }] });
         setTicket(first);
       }
       setHydrated(true);
@@ -958,6 +1016,7 @@ export default function Home() {
   const settle = (revealAll = true) => {
     if (!ticket || ticket.settled || settleLock.current) return;
     settleLock.current = true;
+    const settledAt = Date.now();
     const totalWin = ticket.cells.reduce((sum, cell) => ticket.winning.includes(cell.number) || cell.instant ? sum + cell.prize * cell.multiplier : sum, 0);
     const effectIntensity = prizeEffectPower(totalWin, ticketType.cost);
     const bigWin = effectIntensity >= 0.62;
@@ -966,7 +1025,8 @@ export default function Home() {
       ...current,
       coins: current.coins + totalWin,
       totalWon: current.totalWon + (totalWin > 0 ? totalWin : 0),
-      log: totalWin > 0 ? pushLog(current.log, { t: Date.now(), k: "win", a: totalWin, n: ticketType.name }) : current.log,
+      dailyStats: addDailyPlayerStat(current.dailyStats, "won", totalWin, settledAt),
+      log: totalWin > 0 ? pushLog(current.log, { t: settledAt, k: "win", a: totalWin, n: ticketType.name }) : current.log,
       bestWins: { ...current.bestWins, [ticket.typeId]: Math.max(current.bestWins[ticket.typeId] || 0, totalWin) },
     }));
     setShowResult(true);
@@ -986,13 +1046,15 @@ export default function Home() {
     const nextPlayed = player.ticketsPlayed + 1;
     const nextLevel = Math.floor(nextPlayed / 5) + 1;
     const leveledUp = nextLevel > player.level;
+    const purchasedAt = Date.now();
     setPlayer((current) => ({
       ...current,
       coins: current.coins - cost,
       ticketsPlayed: nextPlayed,
       level: nextLevel,
       totalSpent: current.totalSpent + cost,
-      log: pushLog(current.log, { t: Date.now(), k: "buy", a: cost, n: type.name }),
+      dailyStats: addDailyPlayerStat(current.dailyStats, "spent", cost, purchasedAt),
+      log: pushLog(current.log, { t: purchasedAt, k: "buy", a: cost, n: type.name }),
     }));
     setTicket(buildTicket(type, false, nextLevel, config.odds, config.multiplierMinLevel, cheat));
     settleLock.current = false;
@@ -1044,7 +1106,8 @@ export default function Home() {
     const fresh = loadConfig();
     setConfig(fresh);
     const first = buildTicket(fresh.types[0], true, 1, fresh.odds, fresh.multiplierMinLevel);
-    setPlayer({ ...DEFAULT_PLAYER, coins: DEFAULT_PLAYER.coins - fresh.types[0].cost, ticketsPlayed: 1, totalSpent: fresh.types[0].cost, log: [{ t: Date.now(), k: "buy", a: fresh.types[0].cost, n: fresh.types[0].name }] });
+    const purchasedAt = Date.now();
+    setPlayer({ ...DEFAULT_PLAYER, coins: DEFAULT_PLAYER.coins - fresh.types[0].cost, ticketsPlayed: 1, totalSpent: fresh.types[0].cost, dailyStats: addDailyPlayerStat({}, "spent", fresh.types[0].cost, purchasedAt), log: [{ t: purchasedAt, k: "buy", a: fresh.types[0].cost, n: fresh.types[0].name }] });
     setTicket(first); settleLock.current = false; setShowResult(false); setPanel(null); setToast("已重新开始");
   };
 

@@ -287,6 +287,7 @@
         bestWin: best,
         totalSpent: Number(p.totalSpent) || 0,
         totalWon: Number(p.totalWon) || 0,
+        dailyStats: p.dailyStats && typeof p.dailyStats === "object" && !Array.isArray(p.dailyStats) ? p.dailyStats : {},
         log: Array.isArray(p.log) ? p.log : [],
         settings: { sound: p.settings ? !!p.settings.sound : true, vibration: p.settings ? !!p.settings.vibration : true }
       };
