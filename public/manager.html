@@ -1044,6 +1044,7 @@
     .manager-view-head h2{font-size:20px;scroll-margin-top:138px}
     .account-summary{grid-template-columns:1fr}
     .account-actions{justify-content:flex-start}
+    body[data-manager-view="overview"] .mobar,
     body[data-manager-view="players"] .mobar,
     body[data-manager-view="account"] .mobar{display:none}
     body[data-manager-view="topups"] .mobar-rtp{display:none}
@@ -1051,7 +1052,7 @@
   }
 </style>
 </head>
-<body class="auth-checking" data-manager-view="tickets">
+<body class="auth-checking" data-manager-view="overview">
 
 <div class="auth-gate" id="authGate" data-state="loading" role="status" aria-live="polite">
   <div class="auth-gate-card">
@@ -1088,37 +1089,41 @@
 
   <nav class="manager-nav" id="managerNav" aria-label="后台功能">
     <p class="manager-nav-label">后台功能</p>
-    <button class="manager-nav-btn on" type="button" data-manager-target="tickets" aria-current="page">
+    <button class="manager-nav-btn on" type="button" data-manager-target="overview" aria-current="page">
       <span class="manager-nav-index">01</span>
+      <span class="manager-nav-copy"><b>总览</b></span>
+    </button>
+    <button class="manager-nav-btn" type="button" data-manager-target="tickets">
+      <span class="manager-nav-index">02</span>
       <span class="manager-nav-copy"><b>票种系统</b></span>
     </button>
     <button class="manager-nav-btn" type="button" data-manager-target="topups">
-      <span class="manager-nav-index">02</span>
+      <span class="manager-nav-index">03</span>
       <span class="manager-nav-copy"><b>配套系统</b></span>
     </button>
     <button class="manager-nav-btn" type="button" data-manager-target="players">
-      <span class="manager-nav-index">03</span>
+      <span class="manager-nav-index">04</span>
       <span class="manager-nav-copy"><b>玩家记录</b></span>
     </button>
     <button class="manager-nav-btn" type="button" data-manager-target="account">
-      <span class="manager-nav-index">04</span>
+      <span class="manager-nav-index">05</span>
       <span class="manager-nav-copy"><b>账户设置</b></span>
     </button>
   </nav>
 
   <div class="editor">
     <div class="manager-view-head">
-      <h2 id="managerViewTitle" tabindex="-1">票种系统</h2>
-      <span class="manager-view-badge" id="managerViewBadge">票种制作</span>
+      <h2 id="managerViewTitle" tabindex="-1">总览</h2>
+      <span class="manager-view-badge" id="managerViewBadge">运营数据</span>
     </div>
 
-    <nav class="tiers" id="tiers" aria-label="选择票种" data-manager-section="tickets">
+    <nav class="tiers" id="tiers" aria-label="选择票种" data-manager-section="tickets" hidden>
       <p class="rail-label">选择票种</p>
       <button class="tier-add" id="btnAddTier" type="button">＋ 新增票种</button>
     </nav>
 
     <!-- 奖金池 -->
-    <section class="card sec" data-manager-section="tickets">
+    <section class="card sec" data-manager-section="tickets" hidden>
       <div class="sec-head">
         <h2>奖金池</h2>
         <span class="tag" id="tagPrize">6 个奖金</span>
@@ -1135,7 +1140,7 @@
     </section>
 
     <!-- 倍数池 -->
-    <section class="card sec" data-manager-section="tickets">
+    <section class="card sec" data-manager-section="tickets" hidden>
       <div class="sec-head">
         <h2>倍数池</h2>
         <span class="tag" id="tagMult">3 个倍数</span>
@@ -1163,7 +1168,7 @@
     </section>
 
     <!-- 基础参数 -->
-    <section class="card sec" data-manager-section="tickets">
+    <section class="card sec" data-manager-section="tickets" hidden>
       <div class="sec-head"><h2>票种参数</h2><button class="btn btn-danger" id="btnDelTier" type="button" style="margin-left:auto;padding:5px 11px;font-size:12px">删除此票种</button><button class="info" type="button" data-help="tier" aria-label="票种参数怎么用" style="margin-left:8px">i</button></div>
       <div class="grid">
         <div class="field">
@@ -1227,7 +1232,7 @@
     </section>
 
     <!-- 中奖概率 -->
-    <section class="card sec" data-manager-section="tickets">
+    <section class="card sec" data-manager-section="tickets" hidden>
       <div class="sec-head">
         <h2>中奖格数概率</h2>
         <span class="tag">全局</span>
@@ -1245,7 +1250,7 @@
       </div>
     </section>
 
-    <div class="category-save" data-manager-section="tickets">
+    <div class="category-save" data-manager-section="tickets" hidden>
       <div class="category-save-copy"><b>发布设置</b><span>保存所有未发布更改</span></div>
       <button class="btn btn-primary" type="button" data-save-config="tickets" disabled>保存并应用</button>
     </div>
@@ -1270,7 +1275,7 @@
     </div>
 
     <!-- 同一浏览器上的玩家盈亏概览 -->
-    <section class="card sec" data-manager-section="players" hidden>
+    <section class="card sec" data-manager-section="overview">
       <div class="sec-head">
         <h2>玩家盈亏概览</h2>
         <span class="tag" id="playerOverviewCount">0 名玩家</span>
@@ -1427,7 +1432,7 @@
     </section>
   </div>
 
-  <aside class="rail" data-manager-section="tickets">
+  <aside class="rail" data-manager-section="tickets" hidden>
     <section class="card gauge">
       <p class="gauge-label">实时赔付率 RTP <button class="info" type="button" data-help="rtp" aria-label="赔付率怎么用">i</button></p>
       <p class="gauge-value" id="rtpValue">—</p>
@@ -1635,6 +1640,10 @@
 
   // ---------- manager categories ----------
   var MANAGER_VIEWS = {
+    overview: {
+      title: "总览",
+      badge: "运营数据"
+    },
     tickets: {
       title: "票种系统",
       badge: "票种制作"
@@ -1654,7 +1663,7 @@
   };
 
   function setManagerView(key, options) {
-    var view = MANAGER_VIEWS[key] ? key : "tickets";
+    var view = MANAGER_VIEWS[key] ? key : "overview";
     var meta = MANAGER_VIEWS[view];
     var opts = options || {};
     document.querySelectorAll("[data-manager-section]").forEach(function (section) {
@@ -1694,7 +1703,7 @@
     if (MANAGER_VIEWS[key]) setManagerView(key, { updateHash: false, instant: true });
   });
   var initialManagerView = location.hash.slice(1);
-  if (!MANAGER_VIEWS[initialManagerView]) initialManagerView = "tickets";
+  if (!MANAGER_VIEWS[initialManagerView]) initialManagerView = "overview";
   setManagerView(initialManagerView, { focus: false, instant: true });
 
   function tokensFromCoins(coins) {
@@ -1716,7 +1725,7 @@
       title: "运营后台使用说明", sub: "这个后台是用来干嘛的",
       body: [
         { h: "它管什么", p: "这里配置每种<b>刮刮乐票种</b>的经济参数——奖金池、倍数池、票价、中奖概率，也可以管理游戏里展示的<b>虚拟金币充值套餐</b>。票种参数会影响玩家的<b>赔付率（RTP）</b>。" },
-        { h: "怎么改", p: "先打开<b>票种系统</b>，再选择要调整的票种。配套、玩家记录和账户操作分别放在其他三个分类中；手机上四个分类会显示在页面顶部。改动后点 <b>保存并应用</b> 才生效。" },
+        { h: "怎么改", p: "<b>总览</b>集中显示玩家盈亏；修改票种时先打开<b>票种系统</b>并选择票种。配套、玩家记录和账户操作各自独立；手机上五个分类会显示在页面顶部。配置改动后点 <b>保存并应用</b> 才生效。" },
         { h: "先盯这个数", p: "右侧<b>实时赔付率 RTP</b> 是最关键的指标：低于 100% 在回收金币，高于 100% 每卖一张都在净发金币。健康区间大约 <b>45%–90%</b>。" },
         { h: "备份与还原", p: "<b>导出配置</b> 存成 JSON 备份；<b>导入配置</b> 载入旧备份；<b>恢复默认</b> 回到出厂参数（会清掉当前改动，慎用）。" },
         { h: "上线前先验证", p: "用<b>模拟验证</b>跑几万张票，看实测赔付率和理论值是否接近，确认没配错再保存。" },
@@ -2369,11 +2378,9 @@
     var amount = Number(coins) || 0;
     return (amount >= 0 ? "+" : "−") + tokenText(Math.abs(amount));
   }
-  function renderPlayerDailyChart(players, selectedUsername) {
-    var selected = selectedUsername && players.find(function (player) { return player.username === selectedUsername; });
-    var scope = selected ? [selected] : players;
-    var scopeLabel = selected ? selected.displayName : "全部玩家";
-    var days = playerAnalytics.aggregateDailyPlayerActivity(scope, { dayCount: 7, now: Date.now() });
+  function renderPlayerDailyChart(players) {
+    var scopeLabel = "全部玩家";
+    var days = playerAnalytics.aggregateDailyPlayerActivity(players, { dayCount: 7, now: Date.now() });
     var maxValue = days.reduce(function (maximum, day) { return Math.max(maximum, day.won, day.spent); }, 0);
     var chart = $("playerDailyChart");
     chart.innerHTML = "";
@@ -2403,11 +2410,12 @@
   }
   function openPlayerFromOverview(username) {
     $("playerLookup").value = username;
+    setManagerView("players", { focus: false });
     renderPlayerReport();
     var heading = $("playerDetailHeading");
     if (heading && heading.scrollIntoView) heading.scrollIntoView({ behavior: "smooth", block: "start" });
   }
-  function renderPlayerOverview(selectedUsername) {
+  function renderPlayerOverview() {
     var players = collectLocalPlayerSummaries();
     refreshPlayerOptions(players);
     var totals = players.reduce(function (summary, player) {
@@ -2456,7 +2464,7 @@
         body.appendChild(row);
       });
     }
-    renderPlayerDailyChart(players, normalizePlayerUsername(selectedUsername));
+    renderPlayerDailyChart(players);
   }
   var PLAYER_LOG_LABELS = { buy: "购票", win: "中奖", daily: "旧版每日奖励", rescue: "救济", topup: "玩家充值（演示）", developer: "开发者试用" };
   function setPlayerLogEmpty(target, message) {
@@ -2678,7 +2686,7 @@
       appendPlayerLogRow($("playerTopupLog"), entry, PLAYER_LOG_LABELS.topup);
     });
     if (!topups.length) setPlayerLogEmpty($("playerTopupLog"), "这名玩家还没有充值记录");
-    renderPlayerOverview(username);
+    renderPlayerOverview();
   }
 
   $("playerSearchForm").onsubmit = function (event) {
