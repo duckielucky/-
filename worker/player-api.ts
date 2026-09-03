@@ -426,10 +426,10 @@ async function ensureTestPlayer(db: D1Database): Promise<StoredPlayer> {
       role: "test",
       password: TEST_PASSWORD,
     });
-  } catch {
+  } catch (cause) {
     const raced = await findPlayerByIdentity(db, TEST_USERNAME);
     if (raced) return raced;
-    throw new Error("Could not create test player");
+    throw cause;
   }
 }
 
@@ -587,7 +587,8 @@ async function requirePlayer(request: Request, env: PlayerApiEnv): Promise<Playe
   try {
     const session = await verifySession(request, env);
     return session || error("玩家登录已过期，请重新登录", 401, "unauthenticated", { "set-cookie": expiredSessionCookie() });
-  } catch {
+  } catch (cause) {
+    console.error("Lucky player API request failed", cause);
     return error("玩家云端服务暂时不可用", 503, "storage_unavailable");
   }
 }
