@@ -10,7 +10,10 @@ const AUTH_BODY_LIMIT_BYTES = 12 * 1024;
 const SAVE_BODY_LIMIT_BYTES = 192 * 1024;
 const MIN_SIGNING_SECRET_BYTES = 32;
 const MAX_SECRET_BYTES = 4 * 1024;
-const PASSWORD_ITERATIONS = 150_000;
+// Cloudflare Workers rejects PBKDF2 iteration counts above 100,000.
+// Keep this at the production runtime ceiling so registration and login work
+// the same way in local Node tests and on the deployed Worker.
+const PASSWORD_ITERATIONS = 100_000;
 const PASSWORD_SALT_BYTES = 16;
 const PASSWORD_HASH_BYTES = 32;
 const PASSWORD_ALGORITHM = `pbkdf2-sha256-v1:${PASSWORD_ITERATIONS}`;
@@ -749,7 +752,8 @@ export async function handlePlayerApi(request: Request, env: PlayerApiEnv): Prom
     if (pathname === PLAYER_PASSWORD_PATH) return await handlePassword(request, env, db, secret);
     if (pathname === PLAYER_ACCOUNT_PATH) return await handleAccountDelete(request, env, db);
     return await handleSave(request, env, db);
-  } catch {
+  } catch (cause) {
+    console.error("Lucky player API request failed", cause);
     return error("玩家云端服务暂时不可用", 503, "storage_unavailable");
   }
 }

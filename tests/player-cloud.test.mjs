@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
 
@@ -106,6 +107,13 @@ function makeSave(label, coins) {
     ticket: null,
   };
 }
+
+test("keeps PBKDF2 within the Cloudflare Workers production limit", async () => {
+  const source = await readFile(new URL("../worker/player-api.ts", import.meta.url), "utf8");
+  const match = source.match(/const PASSWORD_ITERATIONS = ([\d_]+);/);
+  assert.ok(match, "password iteration constant must remain explicit and testable");
+  assert.ok(Number(match[1].replaceAll("_", "")) <= 100_000);
+});
 
 test("registers cloud players with a signed session and no plaintext password", async (t) => {
   const db = createD1();
