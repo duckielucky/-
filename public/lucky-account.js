@@ -1,13 +1,10 @@
 /* ============================================================
-   Lucky Scratch — device-local account library
+   Lucky Scratch — cloud account bridge
    ------------------------------------------------------------
-   HONEST SCOPE: this is a front-end demo account system. Accounts
-   live in this browser's localStorage only — there is NO server,
-   NO cloud sync, and NO cross-device login. Passwords are hashed
-   with PBKDF2-SHA256 (never stored in clear), which is correct
-   practice, but client-side storage is not a substitute for real
-   server-side auth. Production accounts need a backend (e.g. the
-   Cloudflare D1 binding already scaffolded in this project).
+   D1 and an HttpOnly signed session are authoritative. localStorage
+   remains a last-known cache so screens can render during brief
+   network interruptions and old device-only accounts can be claimed
+   on their first successful cloud login.
    ============================================================ */
 (function (global) {
   "use strict";
@@ -15,6 +12,14 @@
   var ACCOUNTS_KEY = "lucky_accounts_v1";
   var SESSION_KEY = "lucky_session_v1";
   var GAME_SAVE_KEY = "lucky_save_v1";
+  var GAME_REVISION_KEY = "lucky_save_revision_v1";
+  var GAME_DIRTY_KEY = "lucky_save_dirty_v1";
+  var PLAYER_REGISTER_API = "/api/player/register";
+  var PLAYER_SESSION_API = "/api/player/session";
+  var PLAYER_PROFILE_API = "/api/player/profile";
+  var PLAYER_PASSWORD_API = "/api/player/password";
+  var PLAYER_ACCOUNT_API = "/api/player/account";
+  var PLAYER_SAVE_API = "/api/player/save";
   var PBKDF2_ITERATIONS = 150000;
   var START_COINS = 20000;
 
@@ -77,6 +82,37 @@
     try { localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(store)); return true; }
     catch (e) { return false; }
   }
+  async function apiRequest(path, options) {
+    var response;
+    try {
+      response = await fetch(path, Object.assign({
+        credentials: "same-origin",
+        cache: "no-store",
+        headers: { accept: "application/json" }
+      }, options || {}));
+    } catch (e) {
+      return { ok: false, status: 0, error: "无法连接云端，请检查网络后重试" };
+    }
+    var payload = null;
+    try { payload = await response.json(); } catch (e) {}
+    if (!response.ok) {
+      return {
+        ok: false,
+        status: response.status,
+        error: payload && typeof payload.error === "string" ? payload.error : "云端服务暂时不可用",
+        code: payload && payload.code,
+        payload: payload
+      };
+    }
+    return { ok: true, status: response.status, payload: payload || {} };
+  }
+  function jsonOptions(method, body) {
+    return {
+      method: method,
+      headers: { accept: "application/json", "content-type": "application/json" },
+      body: JSON.stringify(body)
+    };
+  }
   var STORAGE_ERR = "保存失败，浏览器存储已满或被禁用";
   function findByEmail(store, email) {
     var lc = String(email).toLowerCase();
@@ -124,6 +160,25 @@
       localStorage.setItem(SESSION_KEY, JSON.stringify({ u: username, at: new Date().toISOString() }));
     } catch (e) {}
   }
+  function cacheRemoteAccount(account) {
+    if (!account || typeof account.username !== "string") return null;
+    var store = readStore();
+    var key = account.username.toLowerCase();
+    var existing = store[key] || {};
+    store[key] = Object.assign({}, existing, account, {
+      username: account.username,
+      role: account.role === "test" ? "test" : "player",
+      coins: Number.isSafeInteger(Number(account.coins)) ? Number(account.coins) : START_COINS,
+      updatedAt: new Date().toISOString()
+    });
+    // Successful cloud auth retires the legacy device-side verifier.
+    delete store[key].password;
+    delete store[key].salt;
+    delete store[key].hash;
+    delete store[key].iterations;
+    if (!writeStore(store)) return null;
+    return store[key];
+  }
   function readSession() {
     try {
       var raw = localStorage.getItem(SESSION_KEY);
@@ -139,14 +194,59 @@
     // publicView strips salt/hash, matching register()/login()/updateProfile().
     return publicView(store[s.u.toLowerCase()] || null);
   }
-  function logout() {
+  async function logout() {
+    // Do not clear the local identity until the server has confirmed that the
+    // HttpOnly cookie was expired. Otherwise a failed request makes the login
+    // page immediately rediscover the still-valid cookie and bounce back in.
+    var result = await apiRequest(PLAYER_SESSION_API, { method: "DELETE", keepalive: true });
+    if (!result.ok && result.status !== 401) return { ok: false, error: result.error, status: result.status };
     try { localStorage.removeItem(SESSION_KEY); } catch (e) {}
+    return { ok: true };
   }
   // The game save is scoped to the signed-in user so accounts don't share
   // progress on a shared device (guests use the bare key).
-  function gameSaveKey() {
+  function gameStorageKeys() {
     var s = readSession();
-    return s && s.u ? GAME_SAVE_KEY + "::" + s.u.toLowerCase() : GAME_SAVE_KEY;
+    var suffix = s && s.u ? "::" + s.u.toLowerCase() : "";
+    return {
+      save: GAME_SAVE_KEY + suffix,
+      revision: GAME_REVISION_KEY + suffix,
+      dirty: GAME_DIRTY_KEY + suffix
+    };
+  }
+  function gameSaveKey() { return gameStorageKeys().save; }
+  function gameRevisionKey() {
+    return gameStorageKeys().revision;
+  }
+  function gameDirtyKey() {
+    return gameStorageKeys().dirty;
+  }
+  function readGameRevision(key) {
+    try {
+      var value = Number(localStorage.getItem(key || gameRevisionKey()));
+      return Number.isSafeInteger(value) && value >= 0 ? value : 0;
+    } catch (e) { return 0; }
+  }
+  function writeGameRevision(value, key) {
+    try { localStorage.setItem(key || gameRevisionKey(), String(value)); } catch (e) {}
+  }
+  function readGameDirty(key) {
+    try { return localStorage.getItem(key || gameDirtyKey()) === "1"; } catch (e) { return false; }
+  }
+  function writeGameDirty(dirty, key) {
+    try {
+      var storageKey = key || gameDirtyKey();
+      if (dirty) localStorage.setItem(storageKey, "1");
+      else localStorage.removeItem(storageKey);
+    } catch (e) {}
+  }
+  function clearGameCacheForUsername(username) {
+    var suffix = "::" + String(username || "").toLowerCase();
+    try {
+      localStorage.removeItem(GAME_SAVE_KEY + suffix);
+      localStorage.removeItem(GAME_REVISION_KEY + suffix);
+      localStorage.removeItem(GAME_DIRTY_KEY + suffix);
+    } catch (e) {}
   }
 
   // strip secrets before returning an account to page code
@@ -174,30 +274,23 @@
       return { ok: false, error: "昵称过长或含有无效字符（最多 40 字）" };
     }
 
-    var store = readStore();
-    if (store[username.toLowerCase()]) return { ok: false, error: "该用户名已被占用" };
-    if (findByEmail(store, email)) return { ok: false, error: "该邮箱已被注册" };
-
-    var salt = randomHex(16);
-    var hash = await derive(password, salt);
-    // Password hashing yields to the event loop. Merge into the latest store so
-    // simultaneous registrations and test-account seeding cannot overwrite one another.
-    store = readStore();
-    if (store[username.toLowerCase()]) return { ok: false, error: "该用户名已被占用" };
-    if (findByEmail(store, email)) return { ok: false, error: "该邮箱已被注册" };
-    var now = new Date().toISOString();
-    var acc = {
-      username: username, email: email, displayName: displayName,
+    var result = await apiRequest(PLAYER_REGISTER_API, jsonOptions("POST", {
+      username: username,
+      email: email,
+      password: password,
+      displayName: displayName,
       avatar: AVATARS.indexOf(input.avatar) >= 0 ? input.avatar : AVATARS[0],
-      color: COLORS.indexOf(input.color) >= 0 ? input.color : COLORS[0],
-      role: "player",
-      salt: salt, hash: hash, iterations: PBKDF2_ITERATIONS,
-      coins: START_COINS, createdAt: now, updatedAt: now
-    };
-    store[username.toLowerCase()] = acc;
-    if (!writeStore(store)) return { ok: false, error: STORAGE_ERR };
-    setSession(username);
-    return { ok: true, account: publicView(acc) };
+      color: COLORS.indexOf(input.color) >= 0 ? input.color : COLORS[0]
+    }));
+    if (!result.ok) return { ok: false, error: result.error };
+    // A deleted account may leave an optional local cache behind. A newly
+    // registered owner of the same username must never inherit that progress.
+    clearGameCacheForUsername(result.payload.account.username);
+    var cached = cacheRemoteAccount(result.payload.account);
+    if (!cached) return { ok: false, error: STORAGE_ERR };
+    setSession(cached.username);
+    writeGameRevision(0);
+    return { ok: true, account: publicView(cached) };
   }
 
   async function login(input) {
@@ -205,90 +298,81 @@
     var password = input.password || "";
     if (!id || !password) return { ok: false, error: "请输入用户名和密码" };
 
-    await ensureTestAccount();   // guarantee the built-in test account exists
-    var store = readStore();
-    var acc = store[id.toLowerCase()] || findByEmail(store, id);
-    // Always run a derive to avoid trivially leaking whether the user exists.
-    var salt = acc ? acc.salt : randomHex(16);
-    var candidate = await derive(password, salt);
-    if (!acc || !safeEqual(candidate, acc.hash)) {
-      return { ok: false, error: "用户名或密码错误" };
+    var cloud = await apiRequest(PLAYER_SESSION_API, jsonOptions("POST", { identity: id, password: password }));
+    if (!cloud.ok && cloud.status === 401) {
+      // One-time migration for accounts created before cloud sync existed.
+      var legacyStore = readStore();
+      var legacy = legacyStore[id.toLowerCase()] || findByEmail(legacyStore, id);
+      if (legacy && typeof legacy.salt === "string" && typeof legacy.hash === "string") {
+        var candidate = await derive(password, legacy.salt);
+        if (safeEqual(candidate, legacy.hash) && publicView(legacy).role !== "test") {
+          var claimed = await apiRequest(PLAYER_REGISTER_API, jsonOptions("POST", {
+            username: legacy.username,
+            email: legacy.email,
+            password: password,
+            displayName: legacy.displayName,
+            avatar: legacy.avatar,
+            color: legacy.color
+          }));
+          if (claimed.ok) cloud = claimed;
+          else if (claimed.status === 409) cloud = await apiRequest(PLAYER_SESSION_API, jsonOptions("POST", { identity: id, password: password }));
+        }
+      }
     }
-    setSession(acc.username);
-    return { ok: true, account: publicView(acc) };
+    if (!cloud.ok) return { ok: false, error: cloud.error };
+    var cached = cacheRemoteAccount(cloud.payload.account);
+    if (!cached) return { ok: false, error: STORAGE_ERR };
+    setSession(cached.username);
+    return { ok: true, account: publicView(cached) };
   }
 
-  function mutateCurrent(fn) {
+  async function refreshSession() {
+    var result = await apiRequest(PLAYER_SESSION_API, { method: "GET" });
+    if (!result.ok) {
+      if (result.status === 401) try { localStorage.removeItem(SESSION_KEY); } catch (e) {}
+      return { ok: false, status: result.status, error: result.error };
+    }
+    var cached = cacheRemoteAccount(result.payload.account);
+    if (!cached) return { ok: false, status: 0, error: STORAGE_ERR };
+    setSession(cached.username);
+    return { ok: true, account: publicView(cached), expiresAt: result.payload.expiresAt };
+  }
+
+  async function updateProfile(patch) {
     var s = readSession();
     if (!s) return { ok: false, error: "你尚未登录" };
-    var store = readStore();
-    var acc = store[s.u.toLowerCase()];
-    if (!acc) return { ok: false, error: "未找到账户" };
-    var res = fn(acc, store);
-    if (res && res.error) return { ok: false, error: res.error };
-    acc.updatedAt = new Date().toISOString();
-    if (!writeStore(store)) return { ok: false, error: STORAGE_ERR };
-    return { ok: true, account: publicView(acc) };
-  }
-
-  function updateProfile(patch) {
-    return mutateCurrent(function (acc, store) {
-      if (patch.displayName != null) {
-        var dn = String(patch.displayName).trim();
-        if (dn.length > 40) return { error: "昵称过长（最多 40 字）" };
-        acc.displayName = dn || acc.username;
-      }
-      if (patch.email != null) {
-        var em = String(patch.email).trim();
-        var ee = validateEmail(em);
-        if (ee) return { error: ee };
-        var other = findByEmail(store, em);
-        if (other && other.username.toLowerCase() !== acc.username.toLowerCase())
-          return { error: "该邮箱已被其他账户使用" };
-        acc.email = em;
-      }
-      if (patch.avatar != null && AVATARS.indexOf(patch.avatar) >= 0) acc.avatar = patch.avatar;
-      if (patch.color != null && COLORS.indexOf(patch.color) >= 0) acc.color = patch.color;
-    });
+    var result = await apiRequest(PLAYER_PROFILE_API, jsonOptions("PATCH", patch));
+    if (!result.ok) return { ok: false, error: result.error };
+    var cached = cacheRemoteAccount(result.payload.account);
+    return cached ? { ok: true, account: publicView(cached) } : { ok: false, error: STORAGE_ERR };
   }
 
   async function changePassword(currentPw, newPw) {
-    var s = readSession();
-    if (!s) return { ok: false, error: "你尚未登录" };
-    var store = readStore();
-    var acc = store[s.u.toLowerCase()];
-    if (!acc) return { ok: false, error: "未找到账户" };
-    if (publicView(acc).role === "test") return { ok: false, error: "内置测试玩家密码固定为 1111" };
-
-    var check = await derive(currentPw || "", acc.salt);
-    if (!safeEqual(check, acc.hash)) return { ok: false, error: "当前密码不正确" };
     var pe = validatePassword(newPw);
     if (pe) return { ok: false, error: pe };
-
-    var salt = randomHex(16);
-    var hash = await derive(newPw, salt);
-    store = readStore();
-    var latest = store[s.u.toLowerCase()];
-    if (!latest) return { ok: false, error: "未找到账户" };
-    if (publicView(latest).role === "test") return { ok: false, error: "内置测试玩家密码固定为 1111" };
-    if (latest.salt !== acc.salt || latest.hash !== acc.hash) return { ok: false, error: "密码已在其他页面更新，请重新登录" };
-    latest.salt = salt;
-    latest.hash = hash;
-    latest.iterations = PBKDF2_ITERATIONS;
-    latest.updatedAt = new Date().toISOString();
-    if (!writeStore(store)) return { ok: false, error: STORAGE_ERR };
-    return { ok: true };
+    var result = await apiRequest(PLAYER_PASSWORD_API, jsonOptions("POST", {
+      currentPassword: currentPw || "",
+      newPassword: newPw
+    }));
+    return result.ok ? { ok: true } : { ok: false, error: result.error };
   }
 
-  function deleteAccount(alsoWipeGame) {
+  async function deleteAccount(alsoWipeGame) {
     var s = readSession();
     if (!s) return { ok: false, error: "你尚未登录" };
+    var keys = gameStorageKeys();
+    var remote = await apiRequest(PLAYER_ACCOUNT_API, { method: "DELETE" });
+    if (!remote.ok) return { ok: false, error: remote.error };
     var store = readStore();
     delete store[s.u.toLowerCase()];
     if (!writeStore(store)) return { ok: false, error: STORAGE_ERR };
     // Wipe only THIS account's game save (compute the key before clearing session).
-    if (alsoWipeGame) { try { localStorage.removeItem(gameSaveKey()); } catch (e) {} }
-    logout();
+    if (alsoWipeGame) { try { localStorage.removeItem(keys.save); } catch (e) {} }
+    try { localStorage.removeItem(keys.revision); } catch (e) {}
+    try { localStorage.removeItem(keys.dirty); } catch (e) {}
+    // The successful account-delete response already expires the HttpOnly
+    // cookie, so only the local cache remains to be cleared here.
+    try { localStorage.removeItem(SESSION_KEY); } catch (e) {}
     return { ok: true };
   }
 
@@ -317,17 +401,149 @@
   }
   function setGameSettings(patch) {
     try {
-      var key = gameSaveKey();
-      var raw = localStorage.getItem(key);
+      var keys = gameStorageKeys();
+      var raw = localStorage.getItem(keys.save);
       if (!raw) return false;
       var save = JSON.parse(raw);
       if (!save || !save.player) return false;
       save.player.settings = save.player.settings || {};
       if (patch.sound != null) save.player.settings.sound = !!patch.sound;
       if (patch.vibration != null) save.player.settings.vibration = !!patch.vibration;
-      localStorage.setItem(key, JSON.stringify(save));
+      save.updatedAt = Date.now();
+      localStorage.setItem(keys.save, JSON.stringify(save));
+      writeGameDirty(true, keys.dirty);
+      void syncGameSave();
       return true;
     } catch (e) { return false; }
+  }
+
+  async function refreshGameSave() {
+    var keys = gameStorageKeys();
+    var beforeRaw = null;
+    try { beforeRaw = localStorage.getItem(keys.save); } catch (e) {}
+    var result = await apiRequest(PLAYER_SAVE_API, { method: "GET" });
+    if (!result.ok) return { ok: false, status: result.status, error: result.error };
+    // A logout/login while the request was in flight must not route the old
+    // account's response into the newly active account's local cache.
+    if (gameStorageKeys().save !== keys.save) {
+      return { ok: false, status: 409, stale: true, error: "登录账户已切换，请重试" };
+    }
+    var revision = Number(result.payload.revision);
+    if (!Number.isSafeInteger(revision) || revision < 0) return { ok: false, status: 0, error: "云存档格式不正确" };
+    var localRaw = null;
+    try { localRaw = localStorage.getItem(keys.save); } catch (e) {}
+    var updatedAt = Number(result.payload.updatedAt) || 0;
+
+    function preserveLocal(raw) {
+      // Rebase the pending local snapshot on the revision just observed. A
+      // concurrent server write is still rejected by the PUT CAS and retried.
+      writeGameRevision(revision, keys.revision);
+      writeGameDirty(true, keys.dirty);
+      if (raw !== null) void syncGameSave();
+      if (raw === null) return { ok: true, save: null, revision: revision, cloudRevision: revision, updatedAt: updatedAt, pending: true };
+      try {
+        return { ok: true, save: JSON.parse(raw), revision: revision, cloudRevision: revision, updatedAt: updatedAt, pending: true };
+      } catch (e) {
+        return { ok: false, status: 0, error: "本机存档格式不正确" };
+      }
+    }
+
+    // Compare both the pre-request snapshot and the dirty marker. This catches
+    // a settings/game mutation made in another tab while the GET was pending.
+    if (localRaw !== beforeRaw || readGameDirty(keys.dirty)) return preserveLocal(localRaw);
+
+    try {
+      // Re-read immediately before applying the response. The check narrows the
+      // remaining cross-tab window and avoids replacing a just-written value.
+      var latestRaw = localStorage.getItem(keys.save);
+      if (latestRaw !== localRaw || readGameDirty(keys.dirty)) return preserveLocal(latestRaw);
+      if (result.payload.save != null) localStorage.setItem(keys.save, JSON.stringify(result.payload.save));
+      else localStorage.removeItem(keys.save);
+    } catch (e) {
+      return { ok: false, status: 0, error: STORAGE_ERR };
+    }
+    writeGameRevision(revision, keys.revision);
+    writeGameDirty(false, keys.dirty);
+    return { ok: true, save: result.payload.save || null, revision: revision, updatedAt: updatedAt };
+  }
+
+  var gameSaveSyncQueue = Promise.resolve();
+  async function performGameSaveSync() {
+    // A later local write can land while a PUT is in flight. Retry it against
+    // the newly acknowledged/conflicting revision instead of replacing it.
+    for (var attempt = 0; attempt < 4; attempt++) {
+      var keys = gameStorageKeys();
+      if (!readGameDirty(keys.dirty)) return { ok: true, skipped: true, revision: readGameRevision(keys.revision) };
+      var save;
+      var raw;
+      var baseRevision = readGameRevision(keys.revision);
+      try {
+        raw = localStorage.getItem(keys.save);
+        if (!raw) return { ok: true, skipped: true, revision: baseRevision };
+        save = JSON.parse(raw);
+      } catch (e) { return { ok: false, error: "本机存档格式不正确" }; }
+      var result = await apiRequest(PLAYER_SAVE_API, jsonOptions("PUT", {
+        baseRevision: baseRevision,
+        save: save
+      }));
+      if (gameStorageKeys().save !== keys.save) {
+        return { ok: false, status: 409, stale: true, error: "登录账户已切换，请重试" };
+      }
+      var currentRaw = null;
+      try { currentRaw = localStorage.getItem(keys.save); } catch (e) {}
+      var payload = result.payload || {};
+      if (result.ok) {
+        var revision = Number(payload.revision);
+        if (!Number.isSafeInteger(revision) || revision < 0) return { ok: false, error: "云存档格式不正确" };
+        writeGameRevision(revision, keys.revision);
+        if (currentRaw === raw) {
+          try { currentRaw = localStorage.getItem(keys.save); } catch (e) {}
+          if (currentRaw === raw) {
+            writeGameDirty(false, keys.dirty);
+            return { ok: true, save: payload.save || save, revision: revision };
+          }
+        }
+        writeGameDirty(true, keys.dirty);
+        if (currentRaw === null) return { ok: true, pending: true, save: null, revision: revision };
+        continue;
+      }
+      if (result.status === 409) {
+        var conflictRevision = Number(payload.revision);
+        if (!Number.isSafeInteger(conflictRevision) || conflictRevision < 0) {
+          return { ok: false, conflict: true, error: result.error || "云存档格式不正确" };
+        }
+        writeGameRevision(conflictRevision, keys.revision);
+        if (currentRaw === raw) {
+          try { currentRaw = localStorage.getItem(keys.save); } catch (e) {}
+        }
+        if (currentRaw !== raw) {
+          writeGameDirty(true, keys.dirty);
+          if (currentRaw === null) {
+            return { ok: false, conflict: true, pending: true, save: null, revision: conflictRevision, error: result.error };
+          }
+          continue;
+        }
+        try {
+          if (payload.save != null) localStorage.setItem(keys.save, JSON.stringify(payload.save));
+          else localStorage.removeItem(keys.save);
+        } catch (e) {
+          writeGameDirty(true, keys.dirty);
+          return { ok: false, conflict: true, error: STORAGE_ERR };
+        }
+        writeGameDirty(false, keys.dirty);
+        return { ok: false, conflict: true, save: payload.save || null, revision: conflictRevision, error: result.error };
+      }
+      return { ok: false, error: result.error, status: result.status };
+    }
+    return { ok: false, pending: true, error: "本机有较新的更改，将稍后重试" };
+  }
+
+  function syncGameSave() {
+    // Serialize profile/settings writes so rapid toggles cannot send the same
+    // base revision concurrently and undo one another on the 409 response.
+    var run = function () { return performGameSaveSync(); };
+    gameSaveSyncQueue = gameSaveSyncQueue.then(run, run);
+    return gameSaveSyncQueue;
   }
 
   // ---- safe same-origin redirect (no open-redirect) ------------------------
@@ -387,11 +603,13 @@
 
   global.LuckyAuth = {
     AVATARS: AVATARS, COLORS: COLORS, START_COINS: START_COINS,
-    register: register, login: login, logout: logout, current: current,
+    register: register, login: login, logout: logout, current: current, refreshSession: refreshSession,
     updateProfile: updateProfile, changePassword: changePassword, deleteAccount: deleteAccount,
     validateUsername: validateUsername, validateEmail: validateEmail,
     validatePassword: validatePassword, passwordScore: passwordScore,
     gameProgress: gameProgress, setGameSettings: setGameSettings,
+    refreshGameSave: refreshGameSave, syncGameSave: syncGameSave,
+    readGameRevision: readGameRevision,
     safeNext: safeNext, requireAuthOr: requireAuthOr, formatCoins: formatCoins,
     ensureTestAccount: ensureTestAccount, TEST_USER: TEST_USER, TEST_PASS: TEST_PASS
   };

@@ -2,6 +2,7 @@
 import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } from "vinext/server/image-optimization";
 import handler from "vinext/server/app-router-entry";
 import { handleConfigApi } from "./config-api";
+import { handlePlayerApi } from "./player-api";
 import {
   handleManagerAuthApi,
   handleManagerPageGate,
@@ -15,6 +16,7 @@ interface Env {
   DB?: D1Database;
   MANAGER_TOKEN?: string;
   MANAGER_PASSWORD?: string;
+  PLAYER_SESSION_SECRET?: string;
   IMAGES: {
     input(stream: ReadableStream): {
       transform(options: Record<string, unknown>): {
@@ -47,6 +49,9 @@ const worker = {
 
     const configResponse = await handleConfigApi(request, env);
     if (configResponse) return configResponse;
+
+    const playerResponse = await handlePlayerApi(request, env);
+    if (playerResponse) return playerResponse;
 
     if (url.pathname === "/_vinext/image") {
       const allowedWidths = [...DEFAULT_DEVICE_SIZES, ...DEFAULT_IMAGE_SIZES];

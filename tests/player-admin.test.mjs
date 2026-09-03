@@ -31,6 +31,109 @@ const browserStorage = new MemoryStorage();
 globalThis.window = globalThis;
 globalThis.localStorage = browserStorage;
 
+function createPlayerCloudMock() {
+  const accounts = new Map();
+  const calls = [];
+  let sessionUsername = null;
+
+  const publicAccount = (account) => ({
+    username: account.username,
+    email: account.email,
+    displayName: account.displayName,
+    avatar: account.avatar,
+    color: account.color,
+    coins: account.coins,
+    createdAt: account.createdAt,
+    role: account.role,
+  });
+  const json = (payload, status = 200) => new Response(JSON.stringify(payload), {
+    status,
+    headers: { "content-type": "application/json" },
+  });
+  const ensureTestPlayer = () => {
+    if (!accounts.has("test")) {
+      accounts.set("test", {
+        username: "test",
+        email: "test@example.com",
+        displayName: "Test",
+        avatar: "🍀",
+        color: "#a83cff",
+        coins: 20000,
+        createdAt: "2026-08-01T00:00:00.000Z",
+        role: "test",
+        password: "1111",
+      });
+    }
+    return accounts.get("test");
+  };
+
+  return {
+    calls,
+    reset() {
+      accounts.clear();
+      calls.length = 0;
+      sessionUsername = null;
+    },
+    async fetch(input, init = {}) {
+      const url = new URL(typeof input === "string" ? input : input.url, "https://lucky.test");
+      const method = String(init.method || (typeof input !== "string" && input.method) || "GET").toUpperCase();
+      const body = init.body ? JSON.parse(String(init.body)) : null;
+      calls.push({ path: url.pathname, method, body, credentials: init.credentials });
+
+      if (url.pathname === "/api/player/register" && method === "POST") {
+        const key = body.username.toLowerCase();
+        const duplicateEmail = [...accounts.values()].some((account) => account.email.toLowerCase() === body.email.toLowerCase());
+        if (accounts.has(key) || duplicateEmail) return json({ error: "用户名或邮箱已被使用" }, 409);
+        const account = {
+          username: body.username,
+          email: body.email,
+          displayName: body.displayName || body.username,
+          avatar: body.avatar || "🍀",
+          color: body.color || "#a83cff",
+          coins: 20000,
+          createdAt: new Date().toISOString(),
+          role: "player",
+          password: body.password,
+        };
+        accounts.set(key, account);
+        sessionUsername = key;
+        return json({ authenticated: true, account: publicAccount(account) }, 201);
+      }
+
+      if (url.pathname === "/api/player/session" && method === "POST") {
+        const identity = String(body.identity || "").toLowerCase();
+        const account = identity === "test" || identity === "testplayer"
+          ? ensureTestPlayer()
+          : [...accounts.values()].find((candidate) => candidate.username.toLowerCase() === identity || candidate.email.toLowerCase() === identity);
+        if (!account || account.password !== body.password) return json({ error: "用户名/邮箱或密码不正确" }, 401);
+        sessionUsername = account.username.toLowerCase();
+        return json({ authenticated: true, account: publicAccount(account) });
+      }
+
+      if (url.pathname === "/api/player/password" && method === "POST") {
+        const account = sessionUsername ? accounts.get(sessionUsername) : null;
+        if (!account) return json({ error: "你尚未登录" }, 401);
+        if (account.role === "test") return json({ error: "内置测试玩家密码固定为 1111" }, 422);
+        if (account.password !== body.currentPassword) return json({ error: "当前密码不正确" }, 401);
+        account.password = body.newPassword;
+        return json({ ok: true });
+      }
+
+      if (url.pathname === "/api/player/session" && method === "GET") {
+        const account = sessionUsername ? accounts.get(sessionUsername) : null;
+        return account
+          ? json({ authenticated: true, account: publicAccount(account), expiresAt: Date.now() + 60000 })
+          : json({ authenticated: false }, 401);
+      }
+
+      return json({ error: "Unexpected mocked player API request" }, 500);
+    },
+  };
+}
+
+const playerCloud = createPlayerCloudMock();
+globalThis.fetch = playerCloud.fetch;
+
 await import("../public/player-admin.js");
 await import("../public/lucky-account.js");
 await globalThis.LuckyAuth.ensureTestAccount();
@@ -308,6 +411,7 @@ test("resets progress and deletes ordinary players, but protects the built-in te
 
 test("public registration always creates a player account even if a role is supplied", async () => {
   browserStorage.clear();
+  playerCloud.reset();
   await globalThis.LuckyAuth.ensureTestAccount();
 
   const result = await globalThis.LuckyAuth.register({
@@ -329,14 +433,21 @@ test("public registration always creates a player account even if a role is supp
   const stored = readJson(browserStorage, ACCOUNTS_KEY).newplayer;
   assert.equal(stored.role, "player");
   assert.equal(stored.password, undefined);
-  assert.match(stored.hash, /^[a-f0-9]{64}$/);
-  assert.match(stored.salt, /^[a-f0-9]{32}$/);
+  assert.equal(stored.hash, undefined, "password hashes must remain server-side");
+  assert.equal(stored.salt, undefined, "password salts must remain server-side");
   assert.equal(readJson(browserStorage, SESSION_KEY).u, "NewPlayer");
   assert.equal(globalThis.LuckyAuth.validateUsername("test"), "该用户名不可用");
+
+  const registerRequest = playerCloud.calls.find((call) => call.path === "/api/player/register");
+  assert.ok(registerRequest, "registration must use the cloud player API");
+  assert.equal(registerRequest.method, "POST");
+  assert.equal(registerRequest.credentials, "same-origin");
+  assert.equal(registerRequest.body.role, undefined, "the browser must not be able to assign an account role");
 });
 
 test("simultaneous public registrations merge without losing either player", async () => {
   browserStorage.clear();
+  playerCloud.reset();
   const [alice, bob] = await Promise.all([
     globalThis.LuckyAuth.register({ username: "Alice_2", email: "alice2@example.com", password: "Aaaa1111" }),
     globalThis.LuckyAuth.register({ username: "Bob_2", email: "bob2@example.com", password: "Bbbb2222" }),
@@ -347,10 +458,12 @@ test("simultaneous public registrations merge without losing either player", asy
   const accounts = readJson(browserStorage, ACCOUNTS_KEY);
   assert.equal(accounts.alice_2.role, "player");
   assert.equal(accounts.bob_2.role, "player");
+  assert.equal(playerCloud.calls.filter((call) => call.path === "/api/player/register").length, 2);
 });
 
 test("test-account seeding and immediate registration preserve both accounts", async () => {
   browserStorage.clear();
+  playerCloud.reset();
   const [seeded, player] = await Promise.all([
     globalThis.LuckyAuth.ensureTestAccount(),
     globalThis.LuckyAuth.register({ username: "FastPlayer", email: "fast@example.com", password: "Ffff4444" }),
@@ -365,6 +478,7 @@ test("test-account seeding and immediate registration preserve both accounts", a
 
 test("the built-in test account cannot change its fixed password", async () => {
   browserStorage.clear();
+  playerCloud.reset();
   await globalThis.LuckyAuth.ensureTestAccount();
   const login = await globalThis.LuckyAuth.login({ identity: "test", password: "1111" });
   assert.equal(login.ok, true);
@@ -372,4 +486,8 @@ test("the built-in test account cannot change its fixed password", async () => {
     ok: false,
     error: "内置测试玩家密码固定为 1111",
   });
+  assert.deepEqual(
+    playerCloud.calls.slice(-2).map((call) => [call.path, call.method]),
+    [["/api/player/session", "POST"], ["/api/player/password", "POST"]],
+  );
 });

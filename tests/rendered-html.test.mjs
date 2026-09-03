@@ -187,7 +187,7 @@ test("serves game bundles asset-first while keeping manager routes protected", a
 });
 
 test("ships the game systems and installable assets", async () => {
-  const [page, layout, styles, accountStyles, accountLibrary, login, registration, profile, manager, playerAdmin, managerAnalytics, managerLoginPage, manifest, serviceWorker, packageJson, configApi] = await Promise.all([
+  const [page, layout, styles, accountStyles, accountLibrary, login, registration, profile, manager, playerAdmin, managerAnalytics, managerLoginPage, manifest, serviceWorker, packageJson, configApi, playerApi] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
@@ -204,6 +204,7 @@ test("ships the game systems and installable assets", async () => {
     readFile(new URL("../public/sw.js", import.meta.url), "utf8"),
     readFile(new URL("../package.json", import.meta.url), "utf8"),
     readFile(new URL("../worker/config-api.ts", import.meta.url), "utf8"),
+    readFile(new URL("../worker/player-api.ts", import.meta.url), "utf8"),
   ]);
   assert.match(page, /const TICKET_TYPES/);
   assert.match(page, /destination-out/);
@@ -218,8 +219,17 @@ test("ships the game systems and installable assets", async () => {
   assert.match(page, /confirmDemoTopup/);
   assert.match(page, /panel\("topup"\)|setPanel\("topup"\)/);
   assert.match(page, /不会真实扣款/);
-  assert.match(page, /代币只保存在本设备/);
+  assert.match(page, /代币随账号云同步/);
   assert.match(page, /currentPackage\.price !== selectedTopup\.price/);
+  assert.match(page, /const PLAYER_SESSION_API = "\/api\/player\/session"/);
+  assert.match(page, /const PLAYER_SAVE_API = "\/api\/player\/save"/);
+  assert.match(page, /JSON\.stringify\(\{ baseRevision, save \}\)/);
+  assert.match(page, /result\.status === 409/);
+  assert.match(page, /remoteRevision > cloudRevisionRef\.current/);
+  assert.match(page, /setToast\("已同步其他设备的最新进度"\)/);
+  assert.match(page, /window\.setInterval\(\(\) => \{ if \(!document\.hidden\) void refresh\(\); \}, 5000\)/);
+  assert.match(page, /window\.addEventListener\("online", onOnline\)/);
+  assert.match(page, /window\.addEventListener\("pagehide", onPageHide\)/);
   for (const topup of NATURAL_DEFAULT_TOPUPS) {
     assert.match(page, new RegExp(`id: "${topup.id}", price: ${topup.price}, coins: ${topup.coins}`));
     assert.match(manager, new RegExp(`id: "${topup.id}", price: ${topup.price}, coins: ${topup.coins}`));
@@ -273,9 +283,21 @@ test("ships the game systems and installable assets", async () => {
   assert.match(login, /注册玩家账户/);
   assert.match(registration, /所有访客均可注册玩家账户，无需邀请码/);
   assert.match(registration, /id="submitBtn">注册玩家账户</);
-  assert.match(accountLibrary, /role:\s*"player"/);
-  assert.match(accountLibrary, /role:\s*"test"/);
+  assert.match(accountLibrary, /role:\s*account\.role === "test" \? "test" : "player"/);
   assert.match(accountLibrary, /"test", "testplayer"/);
+  assert.match(accountLibrary, /var PLAYER_REGISTER_API = "\/api\/player\/register"/);
+  assert.match(accountLibrary, /var PLAYER_SAVE_API = "\/api\/player\/save"/);
+  assert.match(accountLibrary, /credentials:\s*"same-origin"/);
+  assert.match(accountLibrary, /baseRevision:\s*baseRevision/);
+  assert.match(accountLibrary, /result\.status === 409/);
+  assert.match(accountLibrary, /currentRaw !== raw/);
+  assert.match(accountLibrary, /localRaw !== beforeRaw \|\| readGameDirty/);
+  assert.match(playerApi, /CREATE TABLE IF NOT EXISTS player_account/);
+  assert.match(playerApi, /CREATE TABLE IF NOT EXISTS player_save/);
+  assert.match(playerApi, /CREATE TABLE IF NOT EXISTS player_login_throttle/);
+  assert.match(playerApi, /current\.revision !== baseRevision/);
+  assert.match(playerApi, /WHERE player_id = \?3 AND revision = \?4/);
+  assert.match(playerApi, /"revision_conflict"/);
   assert.match(profile, /class="auth-shell profile-shell"/);
   assert.match(manager, /id="btnLogout"/);
   assert.match(manager, /id="btnChangePw"/);
@@ -413,7 +435,7 @@ test("ships the game systems and installable assets", async () => {
   assert.match(serviceWorker, /caches\.open\(CACHE\)/);
   assert.match(serviceWorker, /pathname\.startsWith\("\/api\/"\)/);
   assert.match(serviceWorker, /canonicalPathname/);
-  assert.match(serviceWorker, /const CACHE = "lucky-scratch-v20"/);
+  assert.match(serviceWorker, /const CACHE = "lucky-scratch-v21"/);
   assert.match(serviceWorker, /pathname === "\/manager\/"/);
   assert.match(serviceWorker, /pathname === "\/manager-login\/"/);
   assert.match(serviceWorker, /pathname === "\/manager-login\.html"/);
@@ -445,10 +467,25 @@ test("ships the game systems and installable assets", async () => {
 test("restored settled tickets do not replay the result poster", async () => {
   const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
   const hydrate = page.slice(page.indexOf("const hydrate = async"), page.indexOf("// Keep operator settings current"));
-  assert.match(hydrate, /settleLock\.current = Boolean\(restoredTicket\?\.settled\)/);
-  assert.doesNotMatch(hydrate, /setShowResult\(Boolean\(restoredTicket\?\.settled\)\)/);
+  assert.match(hydrate, /settleLock\.current = Boolean\(restored\.ticket\?\.settled\)/);
+  assert.doesNotMatch(hydrate, /setShowResult\(Boolean\(restored\.ticket\?\.settled\)\)/);
   assert.match(hydrate, /setShowResult\(false\)/);
   assert.equal((page.match(/setShowResult\(true\)/g) ?? []).length, 1);
+});
+
+test("cloud save writes preserve newer local work across conflicts and disposal", async () => {
+  const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+  const pushStart = page.indexOf("const pushCloudSnapshot = useCallback");
+  const pushEnd = page.indexOf("useEffect(() => {", pushStart);
+  assert.notEqual(pushStart, -1);
+  assert.notEqual(pushEnd, -1);
+  const push = page.slice(pushStart, pushEnd);
+
+  assert.match(push, /const pendingStillMatchesSent = cloudPendingContentRef\.current === content/);
+  assert.match(push, /writeCachedSaveRevision\(revision, sentRevisionKey\)[\s\S]*?markCachedSaveDirty\(!pendingStillMatchesSent, sentDirtyKey\)[\s\S]*?if \(disposed\) return/);
+  assert.match(push, /if \(remote && pendingStillMatchesSent\)[\s\S]*?applyCloudSnapshot\(result\.payload\.save, revision, true\)/);
+  assert.match(push, /else if \(remote\) \{[\s\S]*?cloudLastContentRef\.current = remoteContent[\s\S]*?writeCachedSaveRevision\(revision, sentRevisionKey\)[\s\S]*?markCachedSaveDirty\(cloudPendingContentRef\.current !== remoteContent, sentDirtyKey\)/);
+  assert.doesNotMatch(push, /if \(cloudSyncDisposedRef\.current\) return;\s*if \(result\.ok/);
 });
 
 test("removes the daily reward claim while preserving legacy history support", async () => {
@@ -485,7 +522,7 @@ test("records player top-ups and labels developer balance changes in the transac
   assert.match(manager, /entry\.k === "buy" \|\| signedAmount < 0/);
   assert.match(profile, /developer:\s*\{[^}]*开发者试用/s);
   assert.match(profile, /LuckyAuth\.formatCoins\(Math\.abs\(amount\)\)/);
-  assert.match(serviceWorker, /lucky-scratch-v20/);
+  assert.match(serviceWorker, /lucky-scratch-v21/);
 });
 
 test("creates, checks, and expires an HttpOnly signed manager session", async () => {

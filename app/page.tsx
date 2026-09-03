@@ -67,8 +67,12 @@ type Player = {
 };
 
 const SAVE_KEY = "lucky_save_v1";
+const SAVE_REVISION_KEY = "lucky_save_revision_v1";
+const SAVE_DIRTY_KEY = "lucky_save_dirty_v1";
 const SESSION_KEY = "lucky_session_v1";
 const ACCOUNTS_KEY = "lucky_accounts_v1";
+const PLAYER_SESSION_API = "/api/player/session";
+const PLAYER_SAVE_API = "/api/player/save";
 const SCRATCH_FOIL_SRC = "/prismatic-scratch-foil.webp";
 let scratchFoilImage: HTMLImageElement | null = null;
 
@@ -87,7 +91,7 @@ function prepareScratchFoil(onReady: () => void): () => void {
   return () => scratchFoilImage?.removeEventListener("load", onReady);
 }
 
-/** The game is gated by the existing device-local login flow. */
+/** Fast local cache check; startup also verifies the signed cloud session. */
 function hasLocalAccountSession(): boolean {
   try {
     const session = JSON.parse(localStorage.getItem(SESSION_KEY) || "null") as { u?: string } | null;
@@ -102,15 +106,140 @@ function hasLocalAccountSession(): boolean {
 /** Scope the save to the signed-in account (from /login.html) so separate
  *  accounts on one device keep separate progress. Guests use the bare key.
  *  Only ever called on the client (inside effects) — never during SSR. */
-function gameSaveKey(): string {
+function localSessionUsername(): string | null {
   try {
-    const raw = localStorage.getItem("lucky_session_v1");
+    const raw = localStorage.getItem(SESSION_KEY);
     if (raw) {
       const s = JSON.parse(raw) as { u?: string };
-      if (s && typeof s.u === "string" && s.u) return SAVE_KEY + "::" + s.u.toLowerCase();
+      if (s && typeof s.u === "string" && s.u) return s.u;
     }
-  } catch { /* fall through to guest key */ }
-  return SAVE_KEY;
+  } catch { /* no usable local session */ }
+  return null;
+}
+
+function scopedGameStorageKey(base: string, verifiedUsername?: string | null): string {
+  const username = verifiedUsername || localSessionUsername();
+  return username ? `${base}::${username.toLowerCase()}` : base;
+}
+
+function gameSaveKey(verifiedUsername?: string | null): string {
+  return scopedGameStorageKey(SAVE_KEY, verifiedUsername);
+}
+
+function gameSaveRevisionKey(verifiedUsername?: string | null): string {
+  return scopedGameStorageKey(SAVE_REVISION_KEY, verifiedUsername);
+}
+
+function gameSaveDirtyKey(verifiedUsername?: string | null): string {
+  return scopedGameStorageKey(SAVE_DIRTY_KEY, verifiedUsername);
+}
+
+function markCachedSaveDirty(dirty: boolean, key = gameSaveDirtyKey()): void {
+  try {
+    if (dirty) localStorage.setItem(key, "1");
+    else localStorage.removeItem(key);
+  } catch { /* cache unavailable */ }
+}
+
+function isCachedSaveDirty(key = gameSaveDirtyKey()): boolean {
+  try {
+    return localStorage.getItem(key) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function readCachedSaveRevision(key = gameSaveRevisionKey()): number {
+  try {
+    const revision = Number(localStorage.getItem(key));
+    return Number.isSafeInteger(revision) && revision >= 0 ? revision : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function writeCachedSaveRevision(revision: number, key = gameSaveRevisionKey()): void {
+  if (!Number.isSafeInteger(revision) || revision < 0) return;
+  try { localStorage.setItem(key, String(revision)); } catch { /* cache unavailable */ }
+}
+
+type CloudAccount = {
+  username: string;
+  email?: string;
+  displayName?: string;
+  avatar?: string;
+  color?: string;
+  coins?: number;
+  role?: "player" | "test";
+  createdAt?: string;
+};
+
+type CloudSavePayload = {
+  save: unknown;
+  revision: number;
+  updatedAt: number;
+};
+
+async function fetchPlayerSession(): Promise<{ authenticated: boolean; account?: CloudAccount; status: number }> {
+  try {
+    const response = await fetch(PLAYER_SESSION_API, {
+      method: "GET",
+      credentials: "same-origin",
+      cache: "no-store",
+      headers: { accept: "application/json" },
+    });
+    const payload = await response.json().catch(() => null) as { authenticated?: unknown; account?: CloudAccount } | null;
+    return { authenticated: response.ok && payload?.authenticated === true, account: payload?.account, status: response.status };
+  } catch {
+    return { authenticated: false, status: 0 };
+  }
+}
+
+function cacheCloudAccount(account: CloudAccount): boolean {
+  if (!account?.username) return false;
+  try {
+    const store = JSON.parse(localStorage.getItem(ACCOUNTS_KEY) || "{}") as Record<string, Record<string, unknown>>;
+    const key = account.username.toLowerCase();
+    store[key] = { ...(store[key] || {}), ...account, updatedAt: new Date().toISOString() };
+    localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(store));
+    localStorage.setItem(SESSION_KEY, JSON.stringify({ u: account.username, at: new Date().toISOString() }));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function fetchCloudGameSave(): Promise<{ ok: boolean; status: number; payload?: CloudSavePayload }> {
+  try {
+    const response = await fetch(PLAYER_SAVE_API, {
+      method: "GET",
+      credentials: "same-origin",
+      cache: "no-store",
+      headers: { accept: "application/json" },
+    });
+    const payload = await response.json().catch(() => null) as CloudSavePayload | null;
+    if (!response.ok || !payload || !Number.isSafeInteger(Number(payload.revision))) return { ok: false, status: response.status };
+    return { ok: true, status: response.status, payload: { ...payload, revision: Number(payload.revision), updatedAt: Number(payload.updatedAt) || 0 } };
+  } catch {
+    return { ok: false, status: 0 };
+  }
+}
+
+async function putCloudGameSave(save: unknown, baseRevision: number, keepalive = false): Promise<{ ok: boolean; status: number; payload?: CloudSavePayload }> {
+  try {
+    const response = await fetch(PLAYER_SAVE_API, {
+      method: "PUT",
+      credentials: "same-origin",
+      cache: "no-store",
+      keepalive,
+      headers: { accept: "application/json", "content-type": "application/json" },
+      body: JSON.stringify({ baseRevision, save }),
+    });
+    const payload = await response.json().catch(() => null) as CloudSavePayload | null;
+    return { ok: response.ok, status: response.status, ...(payload ? { payload } : {}) };
+  } catch {
+    return { ok: false, status: 0 };
+  }
 }
 const TICKET_TYPES: TicketType[] = [
   { id: "starter_100x", name: "100X Starter", shortName: "100X", cost: 500, unlockLevel: 1, maxLabel: "100X", accent: "#d743ff", accent2: "#7c2eff", prizePool: [50, 100, 250, 500, 750, 1500], feature: "经典对号中奖", multipliers: [2, 5, 10], specialChance: 0.06 },
@@ -343,8 +472,10 @@ function localAccountStartingCoins(): number {
   }
 }
 
-function initialPlayerFor(type: TicketType, purchasedAt: number): Player {
-  const startingCoins = localAccountStartingCoins();
+function initialPlayerFor(type: TicketType, purchasedAt: number, verifiedStartingCoins?: number): Player {
+  const startingCoins = Number.isSafeInteger(verifiedStartingCoins) && Number(verifiedStartingCoins) >= 0
+    ? Number(verifiedStartingCoins)
+    : localAccountStartingCoins();
   const paid = Math.min(startingCoins, type.cost);
   return {
     ...DEFAULT_PLAYER,
@@ -354,6 +485,60 @@ function initialPlayerFor(type: TicketType, purchasedAt: number): Player {
     dailyStats: addDailyPlayerStat({}, "spent", paid, purchasedAt),
     log: [{ t: purchasedAt, k: "buy", a: paid, n: type.name }],
   };
+}
+
+type PersistedGameSave = {
+  player: Player;
+  ticket: Ticket | null;
+  saveVersion: 2;
+  updatedAt: number;
+};
+
+function makePersistedGameSave(player: Player, ticket: Ticket | null): PersistedGameSave {
+  return { player, ticket, saveVersion: 2, updatedAt: Date.now() };
+}
+
+function canonicalGameSave(save: Pick<PersistedGameSave, "player" | "ticket">): string {
+  return JSON.stringify({ player: save.player, ticket: save.ticket, saveVersion: 2 });
+}
+
+function restoreGameSave(value: unknown, config: GameConfig): { player: Player; ticket: Ticket | null } | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const parsed = value as Partial<PersistedGameSave>;
+  if (!parsed.player || typeof parsed.player !== "object" || Array.isArray(parsed.player)) return null;
+  const rawPlayer = parsed.player as Player;
+  const mergedPlayer: Player = {
+    ...DEFAULT_PLAYER,
+    ...rawPlayer,
+    settings: { ...DEFAULT_PLAYER.settings, ...rawPlayer.settings },
+    bestWins: rawPlayer.bestWins && typeof rawPlayer.bestWins === "object" ? rawPlayer.bestWins : {},
+    log: Array.isArray(rawPlayer.log) ? rawPlayer.log.slice(0, LOG_MAX) : [],
+    dailyStats: restoreDailyStats(rawPlayer.dailyStats, rawPlayer.log),
+  };
+  if (parsed.ticket === null || parsed.ticket === undefined) return { player: mergedPlayer, ticket: null };
+  const rawTicket = parsed.ticket as Ticket;
+  if (
+    !rawTicket
+    || typeof rawTicket !== "object"
+    || typeof rawTicket.id !== "string"
+    || typeof rawTicket.typeId !== "string"
+    || !Array.isArray(rawTicket.winning)
+    || !Array.isArray(rawTicket.cells)
+    || rawTicket.cells.length !== 16
+    || !Array.isArray(rawTicket.scratched)
+    || rawTicket.scratched.length !== 16
+  ) return null;
+  const legacyType = config.types.find((type) => type.id === rawTicket.typeId) || config.types[0];
+  const ticket: Ticket = {
+    ...rawTicket,
+    scratched: rawTicket.scratched.map(Boolean),
+    typeSnapshot: rawTicket.typeSnapshot || {
+      ...legacyType,
+      prizePool: [...legacyType.prizePool],
+      multipliers: [...legacyType.multipliers],
+    },
+  };
+  return { player: mergedPlayer, ticket };
 }
 
 const formatCoins = (value: number) => new Intl.NumberFormat("en-US").format(value);
@@ -758,11 +943,24 @@ export default function Home() {
   const [coinInput, setCoinInput] = useState("");
   const settleLock = useRef(false);
   const saveKeyRef = useRef(SAVE_KEY);
+  const saveRevisionKeyRef = useRef(SAVE_REVISION_KEY);
+  const saveDirtyKeyRef = useRef(SAVE_DIRTY_KEY);
+  const configRef = useRef<GameConfig>(DEFAULT_CONFIG);
+  const cloudRevisionRef = useRef(0);
+  const cloudLastContentRef = useRef("");
+  const cloudPendingContentRef = useRef("");
+  const cloudPushTimerRef = useRef<number | null>(null);
+  const cloudPushInFlightRef = useRef(false);
+  const cloudSyncReadyRef = useRef(false);
+  const cloudSyncDisposedRef = useRef(false);
+  const cloudPushRunnerRef = useRef<(keepalive?: boolean) => void>(() => undefined);
   const brandTapRef = useRef({ n: 0, t: 0 });
   const gameCardRef = useRef<HTMLElement>(null);
   const sheetRef = useRef<HTMLElement>(null);
   const topupConfirmRef = useRef<HTMLDivElement>(null);
   const collectionCarouselRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => { configRef.current = config; }, [config]);
 
   useEffect(() => {
     if (!panel) return;
@@ -862,56 +1060,213 @@ export default function Home() {
     try { localStorage.setItem(CHEAT_KEY, JSON.stringify(cheat)); } catch { /* storage disabled */ }
   }, [cheat, devArmed]);
 
+  const applyCloudSnapshot = useCallback((value: unknown, revision: number, notify = false): boolean => {
+    const restored = restoreGameSave(value, configRef.current);
+    if (!restored || !Number.isSafeInteger(revision) || revision < 1) return false;
+    const content = canonicalGameSave(restored);
+    if (cloudPushTimerRef.current !== null) {
+      window.clearTimeout(cloudPushTimerRef.current);
+      cloudPushTimerRef.current = null;
+    }
+    cloudRevisionRef.current = revision;
+    cloudLastContentRef.current = content;
+    cloudPendingContentRef.current = content;
+    writeCachedSaveRevision(revision, saveRevisionKeyRef.current);
+    markCachedSaveDirty(false, saveDirtyKeyRef.current);
+    try {
+      localStorage.setItem(saveKeyRef.current, JSON.stringify({ ...restored, saveVersion: 2, updatedAt: Date.now() }));
+    } catch { /* React state still receives the authoritative cloud copy */ }
+    setPlayer(restored.player);
+    setTicket(restored.ticket);
+    settleLock.current = Boolean(restored.ticket?.settled);
+    setShowResult(false);
+    if (notify) setToast("已同步其他设备的最新进度");
+    return true;
+  }, []);
+
+  const pushCloudSnapshot = useCallback(async (keepalive = false): Promise<void> => {
+    if (!cloudSyncReadyRef.current || cloudSyncDisposedRef.current || cloudPushInFlightRef.current) return;
+    const content = cloudPendingContentRef.current;
+    if (!content || content === cloudLastContentRef.current) return;
+    let save: PersistedGameSave;
+    try {
+      const parsed = JSON.parse(content) as Omit<PersistedGameSave, "updatedAt">;
+      save = { ...parsed, updatedAt: Date.now() };
+    } catch {
+      return;
+    }
+    const baseRevision = cloudRevisionRef.current;
+    // Capture the account-scoped cache keys with the snapshot. A response may
+    // finish after this page has unmounted or the active session has changed.
+    const sentSaveKey = saveKeyRef.current;
+    const sentRevisionKey = saveRevisionKeyRef.current;
+    const sentDirtyKey = saveDirtyKeyRef.current;
+    cloudPushInFlightRef.current = true;
+    const result = await putCloudGameSave(save, baseRevision, keepalive);
+    cloudPushInFlightRef.current = false;
+    const disposed = cloudSyncDisposedRef.current;
+    const pendingStillMatchesSent = cloudPendingContentRef.current === content;
+    if (result.ok && result.payload && Number.isSafeInteger(Number(result.payload.revision))) {
+      const revision = Number(result.payload.revision);
+      cloudRevisionRef.current = revision;
+      cloudLastContentRef.current = content;
+      writeCachedSaveRevision(revision, sentRevisionKey);
+      // Complete cache bookkeeping even after unmount. If another action was
+      // recorded while this PUT was pending, its cached snapshot stays dirty
+      // but is now correctly based on the revision accepted by D1.
+      markCachedSaveDirty(!pendingStillMatchesSent, sentDirtyKey);
+    } else if (result.status === 409 && result.payload) {
+      const revision = Number(result.payload.revision);
+      if (result.payload.save && Number.isSafeInteger(revision) && revision >= 1) {
+        const remote = restoreGameSave(result.payload.save, configRef.current);
+        if (remote && pendingStillMatchesSent) {
+          if (disposed) {
+            // There is no mounted view left to update, but the unchanged local
+            // snapshot can safely yield to the authoritative server version.
+            const remoteContent = canonicalGameSave(remote);
+            cloudRevisionRef.current = revision;
+            cloudLastContentRef.current = remoteContent;
+            cloudPendingContentRef.current = remoteContent;
+            writeCachedSaveRevision(revision, sentRevisionKey);
+            markCachedSaveDirty(false, sentDirtyKey);
+            try {
+              localStorage.setItem(sentSaveKey, JSON.stringify({ ...remote, saveVersion: 2, updatedAt: Date.now() }));
+            } catch { /* the next load can fetch the same cloud snapshot */ }
+          } else {
+            applyCloudSnapshot(result.payload.save, revision, true);
+          }
+        } else if (remote) {
+          // A newer local action landed while the stale PUT was in flight.
+          // Advance only the known cloud baseline; never replace that newer
+          // local state. The retry below will CAS it against this revision.
+          const remoteContent = canonicalGameSave(remote);
+          cloudRevisionRef.current = revision;
+          cloudLastContentRef.current = remoteContent;
+          writeCachedSaveRevision(revision, sentRevisionKey);
+          // Another device may already have written the exact newer snapshot.
+          // In that case the conflict itself completes reconciliation.
+          markCachedSaveDirty(cloudPendingContentRef.current !== remoteContent, sentDirtyKey);
+        }
+      } else if (result.payload.save == null && revision === 0) {
+        // The server-side save was reset. Rebase the still-pending local
+        // snapshot onto revision zero instead of retrying the stale base forever.
+        cloudRevisionRef.current = 0;
+        cloudLastContentRef.current = "";
+        writeCachedSaveRevision(0, sentRevisionKey);
+        markCachedSaveDirty(true, sentDirtyKey);
+      }
+    } else if (result.status === 401) {
+      if (disposed) return;
+      cloudSyncReadyRef.current = false;
+      setToast("登录已过期，请重新登录");
+      window.setTimeout(() => window.location.replace("/login.html?next=%2F"), 900);
+      return;
+    }
+    if (disposed) return;
+    if (cloudPendingContentRef.current !== cloudLastContentRef.current && cloudSyncReadyRef.current) {
+      if (cloudPushTimerRef.current !== null) window.clearTimeout(cloudPushTimerRef.current);
+      cloudPushTimerRef.current = window.setTimeout(() => cloudPushRunnerRef.current(false), 350);
+    }
+  }, [applyCloudSnapshot]);
+
+  useEffect(() => {
+    const runner = (keepalive = false) => { void pushCloudSnapshot(keepalive); };
+    cloudPushRunnerRef.current = runner;
+    return () => {
+      if (cloudPushRunnerRef.current === runner) cloudPushRunnerRef.current = () => undefined;
+    };
+  }, [pushCloudSnapshot]);
+
   useEffect(() => {
     let cancelled = false;
+    cloudSyncDisposedRef.current = false;
     const hydrate = async () => {
-      if (!hasLocalAccountSession()) {
+      const hadLocalSession = hasLocalAccountSession();
+      const session = await fetchPlayerSession();
+      if (cancelled) return;
+      if (session.authenticated && session.account) {
+        cacheCloudAccount(session.account);
+        if (session.account.avatar) setProfileAvatar(session.account.avatar);
+      } else if (session.status === 401 || !hadLocalSession) {
+        try { localStorage.removeItem(SESSION_KEY); } catch { /* storage unavailable */ }
         window.location.replace("/login.html?next=%2F");
         return;
       }
-      const startup = await resolveStartupConfig();
+      const [startup, cloud] = await Promise.all([
+        resolveStartupConfig(),
+        session.authenticated ? fetchCloudGameSave() : Promise.resolve({ ok: false, status: 0 }),
+      ]);
       if (cancelled) return;
+      configRef.current = startup;
       setConfig(startup);
-      const saveKey = gameSaveKey();
+      const syncUsername = session.authenticated && session.account?.username
+        ? session.account.username
+        : localSessionUsername();
+      const saveKey = gameSaveKey(syncUsername);
       saveKeyRef.current = saveKey;
+      saveRevisionKeyRef.current = gameSaveRevisionKey(syncUsername);
+      saveDirtyKeyRef.current = gameSaveDirtyKey(syncUsername);
+      let restored: { player: Player; ticket: Ticket | null } | null = null;
       try {
         const saved = localStorage.getItem(saveKey);
-        if (saved) {
-          const parsed = JSON.parse(saved) as { player: Player; ticket: Ticket | null };
-          const mergedPlayer = {
-            ...DEFAULT_PLAYER,
-            ...parsed.player,
-            settings: { ...DEFAULT_PLAYER.settings, ...parsed.player?.settings },
-            dailyStats: restoreDailyStats(parsed.player?.dailyStats, parsed.player?.log),
-          };
-          const legacyType = startup.types.find((type) => type.id === parsed.ticket?.typeId) || startup.types[0];
-          const restoredTicket = parsed.ticket
-            ? { ...parsed.ticket, typeSnapshot: parsed.ticket.typeSnapshot || { ...legacyType, prizePool: [...legacyType.prizePool], multipliers: [...legacyType.multipliers] } }
-            : null;
-          setPlayer(mergedPlayer);
-          setTicket(restoredTicket);
-          settleLock.current = Boolean(restoredTicket?.settled);
-          // A settled ticket stays settled, but its result poster belongs only
-          // to the settlement that happened in this page session. Returning
-          // from Profile or refreshing must not replay an old result.
-          setShowResult(false);
+        if (saved) restored = restoreGameSave(JSON.parse(saved), startup);
+      } catch { /* fall back to a fresh ticket below */ }
+
+      const cachedRevision = readCachedSaveRevision(saveRevisionKeyRef.current);
+      const localSaveWasDirty = isCachedSaveDirty(saveDirtyKeyRef.current);
+
+      if (cloud.ok && cloud.payload) {
+        cloudSyncReadyRef.current = true;
+        cloudRevisionRef.current = cloud.payload.revision;
+        writeCachedSaveRevision(cloud.payload.revision, saveRevisionKeyRef.current);
+        if (cloud.payload.save) {
+          const remote = restoreGameSave(cloud.payload.save, startup);
+          if (remote) {
+            cloudLastContentRef.current = canonicalGameSave(remote);
+            // A pagehide/connection failure can leave a newer local snapshot
+            // queued against the exact cloud revision it was based on. Keep
+            // that snapshot and let the normal CAS write finish it instead of
+            // discarding the last action when this device reopens online.
+            if (!(restored && localSaveWasDirty && cachedRevision === cloud.payload.revision)) {
+              restored = remote;
+              markCachedSaveDirty(false, saveDirtyKeyRef.current);
+            }
+          }
         } else {
-          const first = buildTicket(startup.types[0], true, 1, startup.odds, startup.multiplierMinLevel);
-          const purchasedAt = Date.now();
-          setPlayer(initialPlayerFor(startup.types[0], purchasedAt));
-          setTicket(first);
+          cloudLastContentRef.current = "";
         }
-      } catch {
+      } else {
+        cloudSyncReadyRef.current = false;
+        cloudRevisionRef.current = readCachedSaveRevision(saveRevisionKeyRef.current);
+      }
+
+      if (!restored) {
         const first = buildTicket(startup.types[0], true, 1, startup.odds, startup.multiplierMinLevel);
         const purchasedAt = Date.now();
-        setPlayer(initialPlayerFor(startup.types[0], purchasedAt));
-        setTicket(first);
+        restored = {
+          player: initialPlayerFor(startup.types[0], purchasedAt, session.authenticated ? Number(session.account?.coins) : undefined),
+          ticket: first,
+        };
       }
+      const content = canonicalGameSave(restored);
+      cloudPendingContentRef.current = content;
+      setPlayer(restored.player);
+      setTicket(restored.ticket);
+      settleLock.current = Boolean(restored.ticket?.settled);
+      // A settled ticket stays settled, but its result poster belongs only to
+      // the settlement that happened in this page session.
+      setShowResult(false);
+      try { localStorage.setItem(saveKey, JSON.stringify({ ...restored, saveVersion: 2, updatedAt: Date.now() })); } catch { /* cache unavailable */ }
       setHydrated(true);
     };
     const hydrationTask = window.setTimeout(() => { void hydrate(); }, 0);
     if (process.env.NODE_ENV === "production" && "serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => undefined);
-    return () => { cancelled = true; window.clearTimeout(hydrationTask); };
+    return () => {
+      cancelled = true;
+      cloudSyncDisposedRef.current = true;
+      window.clearTimeout(hydrationTask);
+      if (cloudPushTimerRef.current !== null) window.clearTimeout(cloudPushTimerRef.current);
+    };
   }, []);
 
   // Keep operator settings current across devices. Existing ticket cells are
@@ -970,8 +1325,83 @@ export default function Home() {
 
   useEffect(() => {
     if (!hydrated) return;
-    localStorage.setItem(saveKeyRef.current, JSON.stringify({ player, ticket, saveVersion: 2, updatedAt: Date.now() }));
+    const save = makePersistedGameSave(player, ticket);
+    const content = canonicalGameSave(save);
+    cloudPendingContentRef.current = content;
+    try { localStorage.setItem(saveKeyRef.current, JSON.stringify(save)); } catch { /* cloud sync can still continue */ }
+    if (content === cloudLastContentRef.current) return;
+    markCachedSaveDirty(true, saveDirtyKeyRef.current);
+    if (!cloudSyncReadyRef.current) return;
+    if (cloudPushTimerRef.current !== null) window.clearTimeout(cloudPushTimerRef.current);
+    cloudPushTimerRef.current = window.setTimeout(() => cloudPushRunnerRef.current(false), 350);
+    return () => {
+      if (cloudPushTimerRef.current !== null) {
+        window.clearTimeout(cloudPushTimerRef.current);
+        cloudPushTimerRef.current = null;
+      }
+    };
   }, [player, ticket, hydrated]);
+
+  // Pull a newer server revision whenever another device could have advanced
+  // the account. The D1 revision, not either phone's clock, decides freshness.
+  useEffect(() => {
+    if (!hydrated) return;
+    let disposed = false;
+    let refreshing = false;
+    const refresh = async () => {
+      if (disposed || refreshing || cloudPushInFlightRef.current) return;
+      refreshing = true;
+      const result = await fetchCloudGameSave();
+      refreshing = false;
+      if (disposed) return;
+      if (result.status === 401) {
+        cloudSyncReadyRef.current = false;
+        setToast("登录已过期，请重新登录");
+        window.setTimeout(() => window.location.replace("/login.html?next=%2F"), 900);
+        return;
+      }
+      if (!result.ok || !result.payload) return;
+      cloudSyncReadyRef.current = true;
+      // Local work must go through PUT/CAS before a read is allowed to replace
+      // it. This also covers a save that began after this GET was sent.
+      if (cloudPushInFlightRef.current || cloudPendingContentRef.current !== cloudLastContentRef.current) {
+        if (!cloudPushInFlightRef.current) cloudPushRunnerRef.current(false);
+        return;
+      }
+      const remoteRevision = Number(result.payload.revision);
+      if (result.payload.save && remoteRevision > cloudRevisionRef.current) {
+        applyCloudSnapshot(result.payload.save, remoteRevision, true);
+        return;
+      }
+      if (remoteRevision === 0 && cloudRevisionRef.current !== 0) {
+        cloudRevisionRef.current = 0;
+        cloudLastContentRef.current = "";
+        writeCachedSaveRevision(0, saveRevisionKeyRef.current);
+      }
+      if (cloudPendingContentRef.current !== cloudLastContentRef.current) cloudPushRunnerRef.current(false);
+    };
+    const onFocus = () => { void refresh(); };
+    const onVisibility = () => {
+      if (document.hidden) cloudPushRunnerRef.current(true);
+      else void refresh();
+    };
+    const onOnline = () => { void refresh(); };
+    const onPageHide = () => cloudPushRunnerRef.current(true);
+    const interval = window.setInterval(() => { if (!document.hidden) void refresh(); }, 5000);
+    window.addEventListener("focus", onFocus);
+    window.addEventListener("online", onOnline);
+    window.addEventListener("pagehide", onPageHide);
+    document.addEventListener("visibilitychange", onVisibility);
+    void refresh();
+    return () => {
+      disposed = true;
+      window.clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener("pagehide", onPageHide);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [applyCloudSnapshot, hydrated]);
 
   // Manager edits are written in another same-origin tab. Apply those changes
   // immediately so an open game cannot overwrite them with stale state.
@@ -981,17 +1411,11 @@ export default function Home() {
       if (event.key === saveKeyRef.current) {
         if (!event.newValue) { window.location.reload(); return; }
         try {
-          const parsed = JSON.parse(event.newValue) as { player?: Player; ticket?: Ticket | null };
-          if (!parsed.player) return;
-          const nextPlayer = {
-            ...DEFAULT_PLAYER,
-            ...parsed.player,
-            settings: { ...DEFAULT_PLAYER.settings, ...parsed.player.settings },
-            dailyStats: restoreDailyStats(parsed.player.dailyStats, parsed.player.log),
-          };
-          setPlayer(nextPlayer);
-          if (parsed.ticket !== undefined) setTicket(parsed.ticket);
-          settleLock.current = Boolean(parsed.ticket?.settled);
+          const restored = restoreGameSave(JSON.parse(event.newValue), configRef.current);
+          if (!restored) return;
+          setPlayer(restored.player);
+          setTicket(restored.ticket);
+          settleLock.current = Boolean(restored.ticket?.settled);
           setShowResult(false);
           setToast("运营后台已更新玩家资料");
         } catch { /* ignore a damaged external edit */ }
@@ -1377,7 +1801,7 @@ export default function Home() {
             <header><div><span>LUCKY SCRATCH</span><h2 id="sheet-title">{panel === "shop" ? "票种商店" : panel === "collection" ? "我的收藏" : panel === "topup" ? "充值虚拟代币" : "设置"}</h2></div><button onClick={() => { setSelectedTopup(null); setPanel(null); }} aria-label="关闭">×</button></header>
 
             {panel === "topup" && <div className="topup-content">
-              <div className="topup-notice"><b>演示充值</b><span>不会真实扣款 · 代币只保存在本设备</span></div>
+              <div className="topup-notice"><b>演示充值</b><span>不会真实扣款 · 代币随账号云同步</span></div>
               {config.topups.length === 0
                 ? <div className="topup-empty"><span>◇</span><b>暂未开放充值套餐</b><p>请稍后再回来看看。</p></div>
                 : <div className="topup-grid">{config.topups.map((item) => (

@@ -25,7 +25,7 @@
       </div>
     </div>
 
-    <!-- game progress (read-only, from the local save) -->
+    <!-- game progress (read-only, refreshed from the cloud save) -->
     <section class="section">
       <h2>游戏进度</h2>
       <div class="stat-grid">
@@ -109,7 +109,7 @@
       </div>
     </section>
 
-    <p class="auth-note"><span>本地演示 · 账户仅保存在本设备</span></p>
+    <p class="auth-note"><span>云端账户 · 游戏进度可跨设备同步</span></p>
   </main>
 </div>
 
@@ -298,18 +298,36 @@
   buildPickers();
   $("app").hidden = false;
 
+  // Refresh identity and game progress from D1. A network interruption keeps
+  // the last-known local copy visible, while an expired session returns to login.
+  LuckyAuth.refreshSession().then(async function (session) {
+    if (!session.ok) {
+      if (session.status === 401) location.replace("/login.html?next=%2Fprofile.html");
+      return;
+    }
+    acc = session.account;
+    chosenAvatar = acc.avatar; chosenColor = acc.color;
+    $("displayName").value = acc.displayName;
+    $("email").value = acc.email;
+    renderHeader();
+    var cloud = await LuckyAuth.refreshGameSave();
+    if (cloud.ok) { renderProgress(); renderLog(); }
+  });
+
   // ---- save profile ----
-  $("profileForm").addEventListener("submit", function (e) {
+  $("profileForm").addEventListener("submit", async function (e) {
     e.preventDefault();
     var pe = $("profileError"); pe.className = "form-error";
     $("f-email").classList.remove("bad"); $("f-display").classList.remove("bad");
 
-    var res = LuckyAuth.updateProfile({
+    var btn = $("saveProfile"); btn.disabled = true; btn.textContent = "保存中…";
+    var res = await LuckyAuth.updateProfile({
       displayName: $("displayName").value,
       email: $("email").value,
       avatar: chosenAvatar,
       color: chosenColor
     });
+    btn.disabled = false; btn.textContent = "保存";
     if (!res.ok) {
       pe.textContent = res.error; pe.className = "form-error on";
       if (/email/i.test(res.error)) $("f-email").classList.add("bad");
@@ -356,9 +374,16 @@
   $("vibToggle").addEventListener("change", function () { syncSetting({ vibration: this.checked }, "振动"); });
 
   // ---- sign out ----
-  $("signOut").onclick = function () {
-    LuckyAuth.logout();
-    location.href = "/login.html";
+  $("signOut").onclick = async function () {
+    var button = $("signOut");
+    button.disabled = true;
+    var result = await LuckyAuth.logout();
+    if (!result.ok) {
+      button.disabled = false;
+      showToast(result.error || "退出失败，请重试", "err");
+      return;
+    }
+    location.replace("/login.html");
   };
 
   // ---- delete (accessible modal: focus trap, Escape, restore focus) ----
@@ -396,10 +421,17 @@
   $("deleteBtn").onclick = openDelModal;
   $("delCancel").onclick = closeDelModal;
   delModal.addEventListener("mousedown", function (e) { if (e.target === delModal) closeDelModal(); });
-  $("delConfirm").onclick = function () {
+  $("delConfirm").onclick = async function () {
+    var button = $("delConfirm");
+    button.disabled = true; button.textContent = "删除中…";
+    var result = await LuckyAuth.deleteAccount($("wipeGame").checked);
+    if (!result.ok) {
+      button.disabled = false; button.textContent = "确认删除";
+      showToast(result.error, "err");
+      return;
+    }
     document.removeEventListener("keydown", onModalKey, true);
     appMain.removeAttribute("inert");
-    LuckyAuth.deleteAccount($("wipeGame").checked);
     location.replace("/register.html");
   };
 })();

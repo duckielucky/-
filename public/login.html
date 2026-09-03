@@ -46,7 +46,7 @@
 
     <p class="auth-alt" style="margin-top:12px"><button type="button" class="linkbtn" id="testLogin" style="color:var(--gold);font-weight:700">一键登录试玩账号（test / 1111）</button></p>
 
-    <p class="auth-note"><span>本地演示 · 账户仅保存在本设备</span></p>
+    <p class="auth-note"><span>云端账户 · 游戏进度可跨设备同步</span></p>
   </main>
 </div>
 
@@ -64,8 +64,10 @@
     toastTimer = setTimeout(function () { toast.className = "toast"; }, 2600);
   }
 
-  // Already signed in → go straight to the requested page (or the game).
-  if (LuckyAuth.current()) { location.replace(LuckyAuth.safeNext("/")); return; }
+  // Confirm the signed HttpOnly cloud session before skipping the login form.
+  LuckyAuth.refreshSession().then(function (session) {
+    if (session.ok) location.replace(LuckyAuth.safeNext("/"));
+  });
 
   document.querySelectorAll(".reveal").forEach(function (btn) {
     btn.onclick = function () {
@@ -85,8 +87,8 @@
   };
 
   $("forgot").onclick = function () {
-    showToast("本地演示无法找回密码，请重新注册", "err");
-    $("h-password").textContent = "本演示账户仅存于本设备，无法通过邮箱重置。如忘记密码请重新注册。";
+    showToast("暂未开放自动找回，请联系管理员", "err");
+    $("h-password").textContent = "账户已保存在云端；如忘记密码，请联系管理员协助处理。";
     $("h-password").classList.add("err");
   };
 

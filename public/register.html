@@ -73,7 +73,7 @@
 
     <p class="auth-alt">已有账户？<a href="/login.html">登录</a></p>
 
-    <p class="auth-note"><span>本地演示 · 账户仅保存在本设备</span></p>
+    <p class="auth-note"><span>云端账户 · 游戏进度可跨设备同步</span></p>
   </main>
 </div>
 
@@ -91,8 +91,10 @@
     toastTimer = setTimeout(function () { toast.className = "toast"; }, 2600);
   }
 
-  // If already signed in, head to the game instead of re-registering.
-  if (LuckyAuth.current()) { location.replace(LuckyAuth.safeNext("/")); return; }
+  // Confirm the signed HttpOnly cloud session before skipping registration.
+  LuckyAuth.refreshSession().then(function (session) {
+    if (session.ok) location.replace(LuckyAuth.safeNext("/"));
+  });
 
   // avatar + colour pickers
   var chosenAvatar = LuckyAuth.AVATARS[0], chosenColor = LuckyAuth.COLORS[0];
