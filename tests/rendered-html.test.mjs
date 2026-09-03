@@ -247,6 +247,8 @@ test("ships the game systems and installable assets", async () => {
   assert.match(styles, /prismatic-winning-tile\.webp/);
   assert.match(page, /prismatic-scratch-foil\.webp/);
   assert.match(styles, /prismatic-scratch-gesture\.png/);
+  assert.match(styles, /\.tile-content\s*\{[^}]*z-index:\s*1[^}]*\}/);
+  assert.match(styles, /\.scratch-canvas\s*\{[^}]*z-index:\s*2[^}]*\}/);
   assert.match(page, /revealed \? "is-miss"/);
   assert.match(page, /匹配<\/em>/);
   assert.match(styles, /revealed-tile-miss\.png/);
