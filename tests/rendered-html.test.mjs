@@ -263,6 +263,8 @@ test("ships the game systems and installable assets", async () => {
   assert.match(page, /canvas\.addEventListener\("touchmove", preventTouchScroll, \{ passive: false \}\)/);
   assert.match(page, /canvas\.removeEventListener\("touchmove", preventTouchScroll\)/);
   assert.match(page, /onPointerMove=\{\(event\) => \{[^}]*event\.preventDefault\(\)/);
+  assert.match(page, /const SCRATCH_AUTO_REVEAL_RATIO = 0\.04/);
+  assert.match(page, /clear \/ sampled >= SCRATCH_AUTO_REVEAL_RATIO/);
   assert.match(page, /revealed \? "is-miss"/);
   assert.match(page, /匹配<\/em>/);
   assert.match(styles, /revealed-tile-miss\.png/);

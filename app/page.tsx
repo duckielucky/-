@@ -74,6 +74,7 @@ const ACCOUNTS_KEY = "lucky_accounts_v1";
 const PLAYER_SESSION_API = "/api/player/session";
 const PLAYER_SAVE_API = "/api/player/save";
 const SCRATCH_FOIL_SRC = "/prismatic-scratch-foil.webp";
+const SCRATCH_AUTO_REVEAL_RATIO = 0.04;
 let scratchFoilImage: HTMLImageElement | null = null;
 
 function prepareScratchFoil(onReady: () => void): () => void {
@@ -730,7 +731,7 @@ function ScratchTile({ cell, revealed, matched, accent, sound, coinsPerToken, on
     let clear = 0;
     let sampled = 0;
     for (let i = 3; i < pixels.length; i += 32) { sampled += 1; if (pixels[i] < 32) clear += 1; }
-    if (clear / sampled >= 0.57) {
+    if (clear / sampled >= SCRATCH_AUTO_REVEAL_RATIO) {
       revealedRef.current = true;
       context.clearRect(0, 0, canvas.width, canvas.height);
       onReveal();
