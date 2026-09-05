@@ -74,7 +74,7 @@ const ACCOUNTS_KEY = "lucky_accounts_v1";
 const PLAYER_SESSION_API = "/api/player/session";
 const PLAYER_SAVE_API = "/api/player/save";
 const SCRATCH_FOIL_SRC = "/prismatic-scratch-foil.webp";
-const SCRATCH_AUTO_REVEAL_RATIO = 0.01;
+const SCRATCH_AUTO_REVEAL_RATIO = 0.2;
 let scratchFoilImage: HTMLImageElement | null = null;
 
 function prepareScratchFoil(onReady: () => void): () => void {
