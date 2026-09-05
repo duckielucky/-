@@ -3,6 +3,8 @@ import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } fr
 import handler from "vinext/server/app-router-entry";
 import { handleConfigApi } from "./config-api";
 import { handlePlayerApi } from "./player-api";
+import { handleManagerPlayersApi } from "./manager-players";
+import { handleManagerSupportApi } from "./manager-support";
 import {
   handleManagerAuthApi,
   handleManagerPageGate,
@@ -43,6 +45,12 @@ const worker = {
 
     const managerAuthResponse = await handleManagerAuthApi(request, env);
     if (managerAuthResponse) return managerAuthResponse;
+
+    const managerPlayersResponse = await handleManagerPlayersApi(request, env);
+    if (managerPlayersResponse) return managerPlayersResponse;
+
+    const managerSupportResponse = await handleManagerSupportApi(request, env);
+    if (managerSupportResponse) return managerSupportResponse;
 
     const managerPageGateResponse = await handleManagerPageGate(request, env);
     if (managerPageGateResponse) return managerPageGateResponse;

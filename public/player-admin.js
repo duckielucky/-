@@ -159,7 +159,7 @@
       if (role === "test" && password) throw new Error("内置测试玩家密码固定为 1111");
       var passwordSecret = null;
       if (password) {
-        if (password.length < 4 || password.length > 128) throw new Error("新密码必须为 4–128 位");
+        if (password.length < 8 || password.length > 128) throw new Error("新密码必须为 8–128 位");
         var newSalt = randomHex(16);
         passwordSecret = { salt: newSalt, hash: await derivePassword(password, newSalt) };
       }

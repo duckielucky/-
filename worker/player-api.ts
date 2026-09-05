@@ -1,3 +1,10 @@
+import {
+  PLAYER_SUPPORT_PATH,
+  createPlayerSupportTicket,
+  listPlayerSupportTickets,
+  parsePlayerSupportSubmission,
+} from "./support-storage";
+
 const PLAYER_REGISTER_PATH = "/api/player/register";
 const PLAYER_SESSION_PATH = "/api/player/session";
 const PLAYER_PROFILE_PATH = "/api/player/profile";
@@ -20,6 +27,7 @@ const PASSWORD_ALGORITHM = `pbkdf2-sha256-v1:${PASSWORD_ITERATIONS}`;
 const SESSION_KEY_CONTEXT = "Lucky player session signing key\u0000v1";
 const SESSION_SIGNATURE_CONTEXT = "Lucky player session cookie\u0000v1\u0000";
 const LOGIN_THROTTLE_CONTEXT = "Lucky player login throttle\u0000v1\u0000";
+const REGISTRATION_THROTTLE_CONTEXT = "Lucky player registration throttle\u0000v1\u0000";
 const LOGIN_THROTTLE_MAX_FAILURES = 8;
 const LOGIN_THROTTLE_WINDOW_MS = 15 * 60 * 1000;
 const TEST_USERNAME = "test";
@@ -212,8 +220,9 @@ async function derivePassword(password: string, salt: Uint8Array): Promise<Uint8
   // Password verification must survive rotation of the session-signing secret.
   // A per-account random salt and PBKDF2 keep credentials independent of it.
   const material = await crypto.subtle.importKey("raw", encoder.encode(password), "PBKDF2", false, ["deriveBits"]);
+  const stableSalt = new Uint8Array(salt);
   const bits = await crypto.subtle.deriveBits(
-    { name: "PBKDF2", salt, iterations: PASSWORD_ITERATIONS, hash: "SHA-256" },
+    { name: "PBKDF2", salt: stableSalt, iterations: PASSWORD_ITERATIONS, hash: "SHA-256" },
     material,
     PASSWORD_HASH_BYTES * 8,
   );
@@ -354,7 +363,7 @@ function validDisplayName(value: unknown, fallback: string): string | null {
 }
 
 function validPassword(value: unknown): value is string {
-  return typeof value === "string" && value.length >= 4 && value.length <= 128;
+  return typeof value === "string" && value.length >= 8 && value.length <= 128;
 }
 
 function publicAccount(account: StoredPlayer) {
@@ -480,6 +489,13 @@ async function loginThrottleKey(request: Request, identity: string, secret: stri
   return bytesToBase64Url(new Uint8Array(digest));
 }
 
+async function registrationThrottleKey(request: Request, secret: string): Promise<string> {
+  const key = await crypto.subtle.importKey("raw", encoder.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const ip = request.headers.get("cf-connecting-ip")?.trim().toLowerCase() || "unknown";
+  const digest = await crypto.subtle.sign("HMAC", key, encoder.encode(`${REGISTRATION_THROTTLE_CONTEXT}${ip}`));
+  return bytesToBase64Url(new Uint8Array(digest));
+}
+
 async function loginRetryAfter(db: D1Database, key: string, now: number): Promise<number | null> {
   const row = await db.prepare(
     "SELECT failed_attempts AS failedAttempts, window_started_at AS windowStartedAt FROM player_login_throttle WHERE key = ?1",
@@ -516,9 +532,13 @@ async function handleRegister(request: Request, env: PlayerApiEnv, db: D1Databas
   if (!username) return error("用户名为 3-20 位字母、数字或下划线", 422, "invalid_username");
   if (!email) return error("邮箱格式不正确", 422, "invalid_email");
   if (email.normalized === TEST_EMAIL) return error("该邮箱不可用于注册", 422, "reserved_email");
-  if (!validPassword(password)) return error("密码必须为 4-128 位", 422, "invalid_password");
+  if (!validPassword(password)) return error("密码必须为 8-128 位", 422, "invalid_password");
   if (!displayName) return error("昵称过长或含有无效字符（最多 40 字）", 422, "invalid_display_name");
   await ensureSchema(db);
+  const throttleKey = await registrationThrottleKey(request, secret);
+  const now = Date.now();
+  const retryAfter = await loginRetryAfter(db, throttleKey, now);
+  if (retryAfter !== null) return error("注册过于频繁，请稍后再试", 429, "rate_limited", { "retry-after": String(retryAfter) });
   if (await findPlayerByIdentity(db, username.normalized)) return error("该用户名已被占用", 409, "username_taken");
   if (await findPlayerByIdentity(db, email.normalized)) return error("该邮箱已被注册", 409, "email_taken");
   let account: StoredPlayer;
@@ -535,6 +555,7 @@ async function handleRegister(request: Request, env: PlayerApiEnv, db: D1Databas
   } catch {
     return error("用户名或邮箱已被注册", 409, "identity_taken");
   }
+  await recordLoginFailure(db, throttleKey, now);
   const session = await issueSession(request, account, secret);
   return json(
     { authenticated: true, account: publicAccount(account), expiresAt: session.expiresAt },
@@ -594,6 +615,52 @@ async function requirePlayer(request: Request, env: PlayerApiEnv): Promise<Playe
     console.error("Lucky player API request failed", cause);
     return error("玩家云端服务暂时不可用", 503, "storage_unavailable");
   }
+}
+
+async function handleSupport(request: Request, env: PlayerApiEnv, db: D1Database): Promise<Response> {
+  if (request.method !== "GET" && request.method !== "POST") {
+    return error("Method not allowed", 405, undefined, { allow: "GET, POST" });
+  }
+  if (request.method === "POST") {
+    const originError = sameOriginError(request);
+    if (originError) return originError;
+  }
+  const authorized = await requirePlayer(request, env);
+  if (authorized instanceof Response) return authorized;
+  if (authorized.account.id === TEST_ACCOUNT_ID || authorized.account.role === "test") {
+    return error(
+      "共享测试账号不保存客服或举报内容，请注册个人账号",
+      403,
+      "shared_test_account",
+    );
+  }
+
+  if (request.method === "GET") {
+    const tickets = await listPlayerSupportTickets(db, authorized.account.id);
+    return json({ tickets });
+  }
+
+  const body = await readJsonBody(request, AUTH_BODY_LIMIT_BYTES);
+  const submission = parsePlayerSupportSubmission(body);
+  if (!submission) {
+    return error("客服或举报资料格式不正确", 422, "invalid_support_ticket");
+  }
+  const result = await createPlayerSupportTicket(db, authorized.account.id, submission);
+  if (result.outcome === "rate_limited") {
+    return error(
+      "提交过于频繁，请稍后再试",
+      429,
+      "rate_limited",
+      { "retry-after": String(result.retryAfter) },
+    );
+  }
+  if (result.outcome === "idempotency_conflict") {
+    return error("该提交编号已用于其他内容", 409, "idempotency_conflict");
+  }
+  return json(
+    { ticket: result.ticket, duplicate: result.outcome === "duplicate" },
+    result.outcome === "created" ? 201 : 200,
+  );
 }
 
 async function handleProfile(request: Request, env: PlayerApiEnv, db: D1Database): Promise<Response> {
@@ -739,6 +806,7 @@ export async function handlePlayerApi(request: Request, env: PlayerApiEnv): Prom
     PLAYER_PASSWORD_PATH,
     PLAYER_ACCOUNT_PATH,
     PLAYER_SAVE_PATH,
+    PLAYER_SUPPORT_PATH,
   ]);
   if (!known.has(pathname)) return null;
   const db = env.DB;
@@ -751,6 +819,7 @@ export async function handlePlayerApi(request: Request, env: PlayerApiEnv): Prom
     if (pathname === PLAYER_PROFILE_PATH) return await handleProfile(request, env, db);
     if (pathname === PLAYER_PASSWORD_PATH) return await handlePassword(request, env, db, secret);
     if (pathname === PLAYER_ACCOUNT_PATH) return await handleAccountDelete(request, env, db);
+    if (pathname === PLAYER_SUPPORT_PATH) return await handleSupport(request, env, db);
     return await handleSave(request, env, db);
   } catch (cause) {
     console.error("Lucky player API request failed", cause);

@@ -149,7 +149,7 @@
   }
   function validatePassword(pw) {
     if (!pw) return "请设置密码";
-    if (pw.length < 4) return "密码至少 4 位";
+    if (pw.length < 8) return "密码至少 8 位";
     if (pw.length > 128) return "密码最多 128 位";
     return null;
   }

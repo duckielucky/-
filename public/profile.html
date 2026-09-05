@@ -76,7 +76,7 @@
       <form id="pwForm" novalidate autocomplete="off">
         <div class="ios-group">
           <div class="ios-row" id="f-cur"><span class="ios-cap">当前密码</span><input class="ios-input" id="curPw" type="password" autocomplete="current-password" placeholder="必填" aria-label="当前密码" /><button type="button" class="reveal" data-target="curPw" aria-label="显示密码">显示</button></div>
-          <div class="ios-row" id="f-new"><span class="ios-cap">新密码</span><input class="ios-input" id="newPw" type="password" autocomplete="new-password" placeholder="至少4位" aria-label="新密码" /><button type="button" class="reveal" data-target="newPw" aria-label="显示密码">显示</button></div>
+          <div class="ios-row" id="f-new"><span class="ios-cap">新密码</span><input class="ios-input" id="newPw" type="password" minlength="8" maxlength="128" autocomplete="new-password" placeholder="至少8位" aria-label="新密码" /><button type="button" class="reveal" data-target="newPw" aria-label="显示密码">显示</button></div>
         </div>
         <div class="strength" id="strength" data-score="0" aria-hidden="true" style="margin-top:11px"><i></i><i></i><i></i><i></i></div>
         <div class="hint" id="h-new" style="margin-top:6px"></div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type TicketType = {
   id: string;
@@ -66,6 +66,20 @@ type Player = {
   log: LogEntry[];
 };
 
+type SupportKind = "support" | "report";
+type SupportTicket = {
+  id: string;
+  requestId: string;
+  kind: SupportKind;
+  category: string;
+  message: string;
+  status: "open" | "in_progress" | "resolved" | "closed";
+  reply: string | null;
+  createdAt: number;
+  updatedAt: number;
+  repliedAt: number | null;
+};
+
 const SAVE_KEY = "lucky_save_v1";
 const SAVE_REVISION_KEY = "lucky_save_revision_v1";
 const SAVE_DIRTY_KEY = "lucky_save_dirty_v1";
@@ -73,6 +87,7 @@ const SESSION_KEY = "lucky_session_v1";
 const ACCOUNTS_KEY = "lucky_accounts_v1";
 const PLAYER_SESSION_API = "/api/player/session";
 const PLAYER_SAVE_API = "/api/player/save";
+const PLAYER_SUPPORT_API = "/api/player/support";
 const SCRATCH_FOIL_SRC = "/prismatic-scratch-foil.webp";
 const SCRATCH_AUTO_REVEAL_RATIO = 0.2;
 let scratchFoilImage: HTMLImageElement | null = null;
@@ -240,6 +255,82 @@ async function putCloudGameSave(save: unknown, baseRevision: number, keepalive =
     return { ok: response.ok, status: response.status, ...(payload ? { payload } : {}) };
   } catch {
     return { ok: false, status: 0 };
+  }
+}
+
+const SUPPORT_CATEGORY_OPTIONS: Record<SupportKind, { value: string; label: string }[]> = {
+  support: [
+    { value: "account", label: "账户问题" },
+    { value: "gameplay", label: "游戏问题" },
+    { value: "topup", label: "充值问题" },
+    { value: "bug", label: "功能异常" },
+    { value: "other", label: "其他" },
+  ],
+  report: [
+    { value: "player", label: "举报玩家" },
+    { value: "cheating", label: "疑似作弊" },
+    { value: "abuse", label: "不当行为" },
+    { value: "other", label: "其他" },
+  ],
+};
+
+const SUPPORT_STATUS_LABELS: Record<SupportTicket["status"], string> = {
+  open: "待处理",
+  in_progress: "处理中",
+  resolved: "已回复",
+  closed: "已关闭",
+};
+
+function supportRequestId(): string {
+  if (typeof crypto.randomUUID === "function") return `web-${crypto.randomUUID()}`;
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return `web-${Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("")}`;
+}
+
+async function getPlayerSupportTickets(): Promise<{ ok: boolean; status: number; tickets: SupportTicket[]; error?: string }> {
+  try {
+    const response = await fetch(PLAYER_SUPPORT_API, {
+      method: "GET",
+      credentials: "same-origin",
+      cache: "no-store",
+      headers: { accept: "application/json" },
+    });
+    const payload = await response.json().catch(() => null) as { tickets?: SupportTicket[]; error?: string } | null;
+    return {
+      ok: response.ok,
+      status: response.status,
+      tickets: Array.isArray(payload?.tickets) ? payload.tickets : [],
+      ...(typeof payload?.error === "string" ? { error: payload.error } : {}),
+    };
+  } catch {
+    return { ok: false, status: 0, tickets: [], error: "暂时无法连接客服，请稍后重试" };
+  }
+}
+
+async function createPlayerSupportTicket(input: {
+  requestId: string;
+  kind: SupportKind;
+  category: string;
+  message: string;
+}): Promise<{ ok: boolean; status: number; ticket?: SupportTicket; error?: string }> {
+  try {
+    const response = await fetch(PLAYER_SUPPORT_API, {
+      method: "POST",
+      credentials: "same-origin",
+      cache: "no-store",
+      headers: { accept: "application/json", "content-type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    const payload = await response.json().catch(() => null) as { ticket?: SupportTicket; error?: string } | null;
+    return {
+      ok: response.ok,
+      status: response.status,
+      ...(payload?.ticket ? { ticket: payload.ticket } : {}),
+      ...(typeof payload?.error === "string" ? { error: payload.error } : {}),
+    };
+  } catch {
+    return { ok: false, status: 0, error: "暂时无法提交，请稍后重试" };
   }
 }
 const TICKET_TYPES: TicketType[] = [
@@ -937,8 +1028,15 @@ export default function Home() {
   const [config, setConfig] = useState<GameConfig>(DEFAULT_CONFIG);
   const [ticket, setTicket] = useState<Ticket | null>(null);
   const [hydrated, setHydrated] = useState(false);
-  const [panel, setPanel] = useState<"shop" | "collection" | "settings" | "topup" | null>(null);
+  const [panel, setPanel] = useState<"shop" | "collection" | "settings" | "topup" | "support" | null>(null);
   const [selectedTopup, setSelectedTopup] = useState<TopupPackage | null>(null);
+  const [supportKind, setSupportKind] = useState<SupportKind>("support");
+  const [supportCategory, setSupportCategory] = useState("account");
+  const [supportMessage, setSupportMessage] = useState("");
+  const [supportTickets, setSupportTickets] = useState<SupportTicket[]>([]);
+  const [supportLoading, setSupportLoading] = useState(false);
+  const [supportSubmitting, setSupportSubmitting] = useState(false);
+  const [supportError, setSupportError] = useState("");
   const [collectionIndex, setCollectionIndex] = useState(0);
   const [showHelp, setShowHelp] = useState(false);
   useEffect(() => { if (!showHelp) return; const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setShowHelp(false); }; window.addEventListener("keydown", onKey); return () => window.removeEventListener("keydown", onKey); }, [showHelp]);
@@ -966,6 +1064,7 @@ export default function Home() {
   const cloudSyncDisposedRef = useRef(false);
   const cloudPushRunnerRef = useRef<(keepalive?: boolean) => void>(() => undefined);
   const brandTapRef = useRef({ n: 0, t: 0 });
+  const supportSubmissionRef = useRef({ fingerprint: "", requestId: "" });
   const gameCardRef = useRef<HTMLElement>(null);
   const sheetRef = useRef<HTMLElement>(null);
   const topupConfirmRef = useRef<HTMLDivElement>(null);
@@ -1021,6 +1120,18 @@ export default function Home() {
     const focusTimer = window.setTimeout(() => topupConfirmRef.current?.focus(), 0);
     return () => window.clearTimeout(focusTimer);
   }, [panel, selectedTopup]);
+
+  useEffect(() => {
+    if (panel !== "support") return;
+    let active = true;
+    void getPlayerSupportTickets().then((result) => {
+      if (!active) return;
+      if (result.ok) setSupportTickets(result.tickets);
+      else setSupportError(result.status === 401 ? "登录已过期，请重新登录" : (result.error || "暂时无法读取处理记录"));
+      setSupportLoading(false);
+    });
+    return () => { active = false; };
+  }, [panel]);
 
   const armDev = useCallback(() => {
     setDevArmed(true);
@@ -1205,7 +1316,9 @@ export default function Home() {
       }
       const [startup, cloud] = await Promise.all([
         resolveStartupConfig(),
-        session.authenticated ? fetchCloudGameSave() : Promise.resolve({ ok: false, status: 0 }),
+        session.authenticated
+          ? fetchCloudGameSave()
+          : Promise.resolve<{ ok: boolean; status: number; payload?: CloudSavePayload }>({ ok: false, status: 0 }),
       ]);
       if (cancelled) return;
       configRef.current = startup;
@@ -1611,6 +1724,54 @@ export default function Home() {
     setTicket(first); settleLock.current = false; setShowResult(false); setPanel(null); setToast("已重新开始");
   };
 
+  const openSupportPanel = (kind: SupportKind) => {
+    setSupportKind(kind);
+    setSupportCategory(SUPPORT_CATEGORY_OPTIONS[kind][0].value);
+    setSupportMessage("");
+    setSupportError("");
+    setSupportLoading(true);
+    setPanel("support");
+  };
+
+  const changeSupportKind = (kind: SupportKind) => {
+    setSupportKind(kind);
+    setSupportCategory(SUPPORT_CATEGORY_OPTIONS[kind][0].value);
+    setSupportError("");
+  };
+
+  const submitSupportTicket = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (supportSubmitting) return;
+    const message = supportMessage.trim();
+    if (message.length < 10) {
+      setSupportError("请至少填写 10 个字，方便管理员了解情况");
+      return;
+    }
+    setSupportSubmitting(true);
+    setSupportError("");
+    const fingerprint = JSON.stringify([supportKind, supportCategory, message]);
+    if (supportSubmissionRef.current.fingerprint !== fingerprint) {
+      supportSubmissionRef.current = { fingerprint, requestId: supportRequestId() };
+    }
+    const result = await createPlayerSupportTicket({
+      requestId: supportSubmissionRef.current.requestId,
+      kind: supportKind,
+      category: supportCategory,
+      message,
+    });
+    setSupportSubmitting(false);
+    if (!result.ok || !result.ticket) {
+      setSupportError(result.status === 401
+        ? "登录已过期，请重新登录"
+        : (result.status === 403 ? "共享测试账号不保存客服或举报内容，请注册个人账号" : (result.error || "提交失败，请稍后重试")));
+      return;
+    }
+    supportSubmissionRef.current = { fingerprint: "", requestId: "" };
+    setSupportMessage("");
+    setSupportTickets((current) => [result.ticket as SupportTicket, ...current.filter((ticket) => ticket.id !== result.ticket?.id)].slice(0, 20));
+    setToast(supportKind === "report" ? "举报已提交，管理员会尽快查看" : "客服请求已提交");
+  };
+
   // ---- Developer cheats (only reachable once dev mode is armed) ----
   const maxUnlockLevel = config.types.reduce((max, type) => Math.max(max, type.unlockLevel), 1);
   const bumpBrandTap = () => {
@@ -1806,9 +1967,9 @@ export default function Home() {
 
       {panel && (
         <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) { setSelectedTopup(null); setPanel(null); } }}>
-          <section ref={sheetRef} tabIndex={-1} className={`sheet${panel === "collection" ? " collection-sheet" : ""}`} role="dialog" aria-modal="true" aria-labelledby="sheet-title">
+          <section ref={sheetRef} tabIndex={-1} className={`sheet${panel === "collection" ? " collection-sheet" : ""}${panel === "support" ? " support-sheet" : ""}`} role="dialog" aria-modal="true" aria-labelledby="sheet-title">
             <div className="sheet-handle" />
-            <header><div><span>LUCKY SCRATCH</span><h2 id="sheet-title">{panel === "shop" ? "票种商店" : panel === "collection" ? "我的收藏" : panel === "topup" ? "充值虚拟代币" : "设置"}</h2></div><button onClick={() => { setSelectedTopup(null); setPanel(null); }} aria-label="关闭">×</button></header>
+            <header><div><span>LUCKY SCRATCH</span><h2 id="sheet-title">{panel === "shop" ? "票种商店" : panel === "collection" ? "我的收藏" : panel === "topup" ? "充值虚拟代币" : panel === "support" ? (supportKind === "report" ? "举报与问题反馈" : "客服中心") : "设置"}</h2></div><button onClick={() => { setSelectedTopup(null); setPanel(null); }} aria-label="关闭">×</button></header>
 
             {panel === "topup" && <div className="topup-content">
               <div className="topup-notice"><b>演示充值</b><span>不会真实扣款 · 代币随账号云同步</span></div>
@@ -1884,10 +2045,41 @@ export default function Home() {
               </div>
             </div>}
 
+            {panel === "support" && <div className="support-content">
+              <div className="support-tabs" role="tablist" aria-label="选择联系类型">
+                <button type="button" role="tab" aria-selected={supportKind === "support"} className={supportKind === "support" ? "active" : ""} onClick={() => changeSupportKind("support")}>联系客服</button>
+                <button type="button" role="tab" aria-selected={supportKind === "report"} className={supportKind === "report" ? "active" : ""} onClick={() => changeSupportKind("report")}>举报 / 反馈</button>
+              </div>
+              <form className="support-form" onSubmit={submitSupportTicket}>
+                <label><span>问题类型</span><select value={supportCategory} onChange={(event) => setSupportCategory(event.target.value)}>{SUPPORT_CATEGORY_OPTIONS[supportKind].map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
+                <label><span>{supportKind === "report" ? "举报详情" : "需要什么帮助"}</span><textarea value={supportMessage} onChange={(event) => setSupportMessage(event.target.value)} minLength={10} maxLength={2000} rows={5} placeholder={supportKind === "report" ? "请说明玩家、时间和发生的情况…" : "请详细说明遇到的问题…"} required /></label>
+                <div className="support-form-footer"><small>{supportMessage.length}/2000</small><button type="submit" disabled={supportSubmitting}>{supportSubmitting ? "提交中…" : "提交"}</button></div>
+                {supportError && <p className="support-error" role="alert">{supportError}</p>}
+              </form>
+              <section className="support-history" aria-labelledby="support-history-title">
+                <div className="support-history-head"><h3 id="support-history-title">我的处理记录</h3><span>最近 20 条</span></div>
+                {supportLoading
+                  ? <p className="support-empty">正在读取…</p>
+                  : supportTickets.length === 0
+                    ? <p className="support-empty">还没有提交记录</p>
+                    : <div className="support-ticket-list">{supportTickets.map((item) => {
+                        const category = SUPPORT_CATEGORY_OPTIONS[item.kind].find((option) => option.value === item.category)?.label || item.category;
+                        return <article className="support-ticket" key={item.id}>
+                          <div><span>{item.kind === "report" ? "举报" : "客服"} · {category}</span><b className={`status-${item.status}`}>{SUPPORT_STATUS_LABELS[item.status]}</b></div>
+                          <p>{item.message}</p>
+                          {item.reply && <blockquote><strong>管理员回复</strong>{item.reply}</blockquote>}
+                          <time dateTime={new Date(item.createdAt).toISOString()}>{new Date(item.createdAt).toLocaleString("zh-CN", { hour12: false })}</time>
+                        </article>;
+                      })}</div>}
+              </section>
+            </div>}
+
             {panel === "settings" && <div className="settings-list">
               <label htmlFor="sound-toggle"><span><b>音效</b><small>刮开、匹配与中奖反馈</small></span><input id="sound-toggle" aria-label="音效" type="checkbox" checked={player.settings.sound} onChange={(event) => setPlayer((current) => ({ ...current, settings: { ...current.settings, sound: event.target.checked } }))} /></label>
               <label htmlFor="vibration-toggle"><span><b>振动</b><small>支持的手机上轻微震动</small></span><input id="vibration-toggle" aria-label="振动" type="checkbox" checked={player.settings.vibration} onChange={(event) => setPlayer((current) => ({ ...current, settings: { ...current.settings, vibration: event.target.checked } }))} /></label>
               <a className="settings-row" href="/profile.html" style={{ textDecoration: "none" }}><span>账户与个人资料</span><b>打开</b></a>
+              <button type="button" className="settings-row" onClick={() => openSupportPanel("support")}><span>联系客服</span><b>打开</b></button>
+              <button type="button" className="settings-row" onClick={() => openSupportPanel("report")}><span>举报 / 问题反馈</span><b>打开</b></button>
               <button className="reset-button" onClick={resetSave}>重置全部进度</button>
               <p>幸运刮刮乐仅使用虚拟代币；RM 金额为运营参考，不涉及真实付款、提现或实物奖励。</p>
             </div>}

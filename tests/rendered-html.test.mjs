@@ -39,6 +39,12 @@ function createConfigDb(initialConfig = null) {
   let managerAccount = null;
   const managerLoginThrottle = new Map();
   return {
+    managerSecretRow() {
+      return managerSecret ? { ...managerSecret } : null;
+    },
+    setManagerSecret(next) {
+      managerSecret = next ? { ...next } : null;
+    },
     managerLoginThrottleRows() {
       return [...managerLoginThrottle.entries()].map(([key, value]) => ({ key, ...value }));
     },
@@ -137,12 +143,41 @@ function sameOriginHeaders(extra = {}) {
   return { origin: API_ORIGIN, "sec-fetch-site": "same-origin", ...extra };
 }
 
-async function managerLogin(db, password = MANAGER_PASSWORD, username = MANAGER_USERNAME, connectingIp = "203.0.113.10") {
+async function managerLogin(
+  db,
+  password = MANAGER_PASSWORD,
+  username = MANAGER_USERNAME,
+  connectingIp = "203.0.113.10",
+  envOverrides = {},
+) {
   return apiFetch(db, "/api/manager/session", {
     method: "POST",
     headers: sameOriginHeaders({ "content-type": "application/json", "cf-connecting-ip": connectingIp }),
     body: JSON.stringify({ username, password }),
-  });
+  }, envOverrides);
+}
+
+function bytesToBase64Url(bytes) {
+  return Buffer.from(bytes).toString("base64url");
+}
+
+async function createLegacyManagerSecret(password, managerToken, updatedAt = 1) {
+  const salt = Uint8Array.from({ length: 16 }, (_, index) => index + 1);
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(managerToken),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const payload = `Lucky manager password hash\u0000v1\u0000${bytesToBase64Url(salt)}\u0000${password}`;
+  const hash = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payload));
+  return {
+    hash: bytesToBase64Url(new Uint8Array(hash)),
+    salt: bytesToBase64Url(salt),
+    algorithm: "hmac-sha256-v1",
+    updatedAt,
+  };
 }
 
 function readSessionCookie(response) {
@@ -330,9 +365,10 @@ test("ships the game systems and installable assets", async () => {
   assert.match(manager, /id="btnSavePlayer"/);
   assert.match(manager, /id="btnResetPlayer"/);
   assert.match(manager, /id="btnDeletePlayer"/);
-  assert.match(manager, /playerAdmin\.updatePlayer/);
-  assert.match(manager, /playerAdmin\.resetProgress/);
-  assert.match(manager, /playerAdmin\.deletePlayer/);
+  assert.match(manager, /async function loadCloudPlayerDetail/);
+  assert.match(manager, /PLAYERS_API \+ "\?username="/);
+  assert.match(manager, /云端离线 · 只读/);
+  assert.doesNotMatch(manager, /playerAdmin\.(?:updatePlayer|resetProgress|deletePlayer)/);
   assert.match(playerAdmin, /root\.LuckyPlayerAdmin/);
   assert.match(playerAdmin, /async function updatePlayer/);
   assert.match(playerAdmin, /function resetProgress/);
@@ -348,11 +384,14 @@ test("ships the game systems and installable assets", async () => {
   assert.match(manager, /src="\/player-analytics\.js"/);
   assert.match(manager, /id="playerSearchForm"[^>]*role="search"/);
   assert.match(manager, /id="playerNameOptions"/);
-  assert.match(manager, /仅此浏览器/);
+  assert.match(manager, /id="playerDataSourceBadge">云端同步/);
+  assert.match(manager, /PLAYERS_API = "\/api\/manager\/players"/);
   assert.match(manager, /data-manager-target="overview"/);
   assert.match(manager, /data-manager-target="tickets"/);
   assert.match(manager, /data-manager-target="topups"/);
   assert.match(manager, /data-manager-target="players"/);
+  assert.match(manager, /data-manager-target="support"/);
+  assert.match(manager, /data-manager-target="admins"/);
   assert.match(manager, /data-manager-target="account"/);
   assert.match(manager, />总览<\/b>/);
   assert.match(manager, /票种系统/);
@@ -391,7 +430,7 @@ test("ships the game systems and installable assets", async () => {
   assert.match(manager, /\.manager-view-head h2\{[^}]*scroll-margin-top:138px/);
   assert.match(manager, /title\.focus\(\{ preventScroll: true \}\)/);
   assert.equal((manager.match(/保存所有未发布更改/g) ?? []).length, 2);
-  assert.match(manager, /if \(normalizePlayerUsername\(\$\("playerLookup"\)\.value\)\) renderPlayerReport\(\)/);
+  assert.match(manager, /normalizePlayerUsername\(\$\("playerLookup"\)\.value\) && !playerEditorDirty\) renderPlayerReport\(\)/);
   assert.match(manager, /PLAYER_SAVE_PREFIX \+ username/);
   assert.match(manager, /function collectLocalPlayerSummaries\(/);
   assert.match(manager, /function renderPlayerOverview\(/);
@@ -651,12 +690,94 @@ test("keeps a strong signing secret separate from the manager password", async (
   }, { MANAGER_PASSWORD: "1234567" });
   assert.equal(shortPassword.status, 503);
 
-  const legacyFallback = await apiFetch(db, "/api/manager/session", {
+  const signingSecretAsPassword = await apiFetch(db, "/api/manager/session", {
     method: "POST",
     headers: sameOriginHeaders({ "content-type": "application/json" }),
     body: JSON.stringify({ username: MANAGER_USERNAME, password: MANAGER_SESSION_SECRET }),
   }, { MANAGER_PASSWORD: undefined });
-  assert.equal(legacyFallback.status, 200);
+  assert.equal(signingSecretAsPassword.status, 401);
+
+  const duplicatedSecrets = await apiFetch(db, "/api/manager/session", {
+    method: "POST",
+    headers: sameOriginHeaders({ "content-type": "application/json" }),
+    body: JSON.stringify({ username: MANAGER_USERNAME, password: MANAGER_SESSION_SECRET }),
+  }, { MANAGER_PASSWORD: MANAGER_SESSION_SECRET });
+  assert.equal(duplicatedSecrets.status, 503);
+
+  const initialized = await managerLogin(db);
+  assert.equal(initialized.status, 200);
+  const stored = db.managerSecretRow();
+  assert.ok(stored);
+  assert.equal(stored.algorithm, "pbkdf2-sha256-v1:100000");
+  assert.notEqual(stored.hash, MANAGER_PASSWORD);
+
+  const rotatedSigningSecret = "unit-test-rotated-manager-session-secret-2026-09-05";
+  const afterRotation = await managerLogin(
+    db,
+    MANAGER_PASSWORD,
+    MANAGER_USERNAME,
+    "203.0.113.11",
+    { MANAGER_TOKEN: rotatedSigningSecret, MANAGER_PASSWORD: undefined },
+  );
+  assert.equal(afterRotation.status, 200, "PBKDF2 owner passwords must survive signing-token rotation");
+  const rotatedSecretAsPassword = await managerLogin(
+    db,
+    rotatedSigningSecret,
+    MANAGER_USERNAME,
+    "203.0.113.12",
+    { MANAGER_TOKEN: rotatedSigningSecret, MANAGER_PASSWORD: undefined },
+  );
+  assert.equal(rotatedSecretAsPassword.status, 401);
+});
+
+test("migrates legacy token-peppered owner passwords to token-independent PBKDF2", async () => {
+  const legacyPassword = "LegacyPass123";
+  const currentTokenDb = createConfigDb();
+  currentTokenDb.setManagerSecret(await createLegacyManagerSecret(legacyPassword, MANAGER_SESSION_SECRET));
+
+  const currentTokenLogin = await managerLogin(
+    currentTokenDb,
+    legacyPassword,
+    MANAGER_USERNAME,
+    "203.0.113.21",
+    { MANAGER_PASSWORD: undefined },
+  );
+  assert.equal(currentTokenLogin.status, 200);
+  assert.equal(currentTokenDb.managerSecretRow()?.algorithm, "pbkdf2-sha256-v1:100000");
+
+  const oldSigningSecret = "unit-test-old-manager-session-secret-2026-08-24";
+  const rotatedSigningSecret = "unit-test-new-manager-session-secret-2026-09-05";
+  const rotatedTokenDb = createConfigDb();
+  rotatedTokenDb.setManagerSecret(await createLegacyManagerSecret(legacyPassword, oldSigningSecret));
+
+  const unavailableWithoutMigrationPassword = await managerLogin(
+    rotatedTokenDb,
+    legacyPassword,
+    MANAGER_USERNAME,
+    "203.0.113.22",
+    { MANAGER_TOKEN: rotatedSigningSecret, MANAGER_PASSWORD: undefined },
+  );
+  assert.equal(unavailableWithoutMigrationPassword.status, 401);
+  assert.equal(rotatedTokenDb.managerSecretRow()?.algorithm, "hmac-sha256-v1");
+
+  const migratedWithExplicitPassword = await managerLogin(
+    rotatedTokenDb,
+    legacyPassword,
+    MANAGER_USERNAME,
+    "203.0.113.23",
+    { MANAGER_TOKEN: rotatedSigningSecret, MANAGER_PASSWORD: legacyPassword },
+  );
+  assert.equal(migratedWithExplicitPassword.status, 200);
+  assert.equal(rotatedTokenDb.managerSecretRow()?.algorithm, "pbkdf2-sha256-v1:100000");
+
+  const staleConfigCannotOverrideStoredPassword = await managerLogin(
+    rotatedTokenDb,
+    "DifferentConfigPass123",
+    MANAGER_USERNAME,
+    "203.0.113.24",
+    { MANAGER_TOKEN: rotatedSigningSecret, MANAGER_PASSWORD: "DifferentConfigPass123" },
+  );
+  assert.equal(staleConfigCannotOverrideStoredPassword.status, 401);
 });
 
 test("changes the manager password in D1 without exposing or reviving credentials", async () => {
@@ -686,6 +807,13 @@ test("changes the manager password in D1 without exposing or reviving credential
   });
   assert.equal(tooShort.status, 422);
 
+  const signingSecretAsNewPassword = await apiFetch(db, "/api/manager/password", {
+    method: "POST",
+    headers: sameOriginHeaders({ "content-type": "application/json", cookie }),
+    body: JSON.stringify({ currentPassword: MANAGER_PASSWORD, newPassword: MANAGER_SESSION_SECRET }),
+  });
+  assert.equal(signingSecretAsNewPassword.status, 422);
+
   const changed = await apiFetch(db, "/api/manager/password", {
     method: "POST",
     headers: sameOriginHeaders({ "content-type": "application/json", cookie }),
@@ -705,7 +833,7 @@ test("changes the manager password in D1 without exposing or reviving credential
   const newPassword = await managerLogin(db, "ChangedPass123");
   assert.equal(newPassword.status, 200);
   const recoveryToken = await managerLogin(db, MANAGER_SESSION_SECRET);
-  assert.equal(recoveryToken.status, 200);
+  assert.equal(recoveryToken.status, 401);
 
   const failingDb = { prepare() { throw new Error("D1 unavailable"); } };
   const oldPasswordDuringOutage = await managerLogin(failingDb, MANAGER_PASSWORD);
@@ -824,7 +952,7 @@ test("changes and persists the manager username behind the existing authenticate
   assert.equal((await caseInsensitiveUsername.clone().json()).username, "Lucky_Admin2");
 
   const recoveryCredential = await managerLogin(db, MANAGER_SESSION_SECRET, "LUCKY_ADMIN2");
-  assert.equal(recoveryCredential.status, 200);
+  assert.equal(recoveryCredential.status, 401);
 });
 
 test("gates encoded manager aliases before static routing", async () => {

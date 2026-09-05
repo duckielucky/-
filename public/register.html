@@ -44,7 +44,7 @@
         <div class="field" id="f-password">
           <label for="password">密码</label>
           <div class="control has-btn">
-            <input id="password" name="password" type="password" autocomplete="new-password" placeholder="至少4位" />
+            <input id="password" name="password" type="password" minlength="8" maxlength="128" autocomplete="new-password" placeholder="至少8位" />
             <button type="button" class="reveal" data-target="password" aria-label="显示密码">显示</button>
           </div>
           <div class="strength" id="strength" data-score="0" aria-hidden="true"><i></i><i></i><i></i><i></i></div>

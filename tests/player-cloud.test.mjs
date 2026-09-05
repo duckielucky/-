@@ -147,6 +147,49 @@ test("registers cloud players with a signed session and no plaintext password", 
   assert.equal(duplicateEmail.status, 409);
 });
 
+test("requires strong player passwords and rate-limits account creation by network", async (t) => {
+  const db = createD1();
+  t.after(() => db.close());
+  const short = await register(db, "ShortPw", "short@example.com", "1234567");
+  assert.equal(short.status, 422);
+  assert.equal((await short.json()).code, "invalid_password");
+
+  for (let index = 0; index < 8; index += 1) {
+    const created = await register(db, `User_${index}`, `user-${index}@example.com`, `SafePass${index}X`);
+    assert.equal(created.status, 201);
+  }
+  const limited = await register(db, "User_999", "user-999@example.com", "SafePass999X");
+  assert.equal(limited.status, 429);
+  assert.equal((await limited.json()).code, "rate_limited");
+  assert.ok(Number(limited.headers.get("retry-after")) > 0);
+});
+
+test("a player login cannot clear the registration throttle bucket", async (t) => {
+  const db = createD1();
+  t.after(() => db.close());
+
+  const collidingIdentity = await register(
+    db,
+    "__registration__",
+    "registration@example.com",
+    "RegistrationPass123",
+  );
+  assert.equal(collidingIdentity.status, 201);
+  for (let index = 0; index < 6; index += 1) {
+    const created = await register(db, `Before_${index}`, `before-${index}@example.com`, `BeforePass${index}X`);
+    assert.equal(created.status, 201);
+  }
+
+  const loggedIn = await login(db, "__registration__", "RegistrationPass123");
+  assert.equal(loggedIn.status, 200);
+  const eighthRegistration = await register(db, "Eighth_User", "eighth@example.com", "EighthPass123");
+  assert.equal(eighthRegistration.status, 201);
+
+  const stillLimited = await register(db, "Ninth_User", "ninth@example.com", "NinthPass123");
+  assert.equal(stillLimited.status, 429);
+  assert.equal((await stillLimited.json()).code, "rate_limited");
+});
+
 test("logs in case-insensitively and fails closed for bad or cross-origin credentials", async (t) => {
   const db = createD1();
   t.after(() => db.close());

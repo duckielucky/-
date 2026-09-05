@@ -254,10 +254,51 @@ button { -webkit-tap-highlight-color: transparent; }
 .settings-list input::after { content: ""; position: absolute; top: 3px; left: 3px; width: 15px; height: 15px; border-radius: 50%; background: white; transition: .2s; }
 .settings-list input:checked { background: var(--cyan); }
 .settings-list input:checked::after { transform: translateX(17px); }
-.settings-row { color: white; cursor: pointer; }
+.settings-row { width: 100%; color: white; font: inherit; text-align: left; cursor: pointer; }
 .settings-row b { color: var(--cyan); font-size: 8px; }
 .reset-button { padding: 12px; border: 1px solid #ff5d7b44; border-radius: 11px; background: #ff31521a; color: #ff91a5; font-size: 9px; font-weight: 900; cursor: pointer; }
 .settings-list > p { color: #6f6478; font-size: 7px; line-height: 1.55; text-align: center; }
+
+.support-sheet { width: min(100%, 520px); }
+.support-content { display: grid; gap: 12px; }
+.support-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 4px; border: 1px solid #ffffff12; border-radius: 13px; background: #09040e80; }
+.support-tabs button { min-height: 38px; border: 0; border-radius: 9px; background: transparent; color: var(--muted); font-size: 9px; font-weight: 900; cursor: pointer; }
+.support-tabs button.active { background: linear-gradient(135deg, #7d27bb, #3a1770); color: #fff; box-shadow: inset 0 1px #ffffff26, 0 6px 18px #0005; }
+.support-form { display: grid; gap: 10px; padding: 13px; border: 1px solid #ffffff12; border-radius: 15px; background: #ffffff05; }
+.support-form label { display: grid; gap: 6px; }
+.support-form label > span { color: #cfc2d5; font-size: 8px; font-weight: 850; letter-spacing: .06em; }
+.support-form select, .support-form textarea { width: 100%; border: 1px solid #765084; border-radius: 10px; outline: none; background: #100617; color: #f7eff9; font: inherit; font-size: 10px; }
+.support-form select { min-height: 40px; padding: 0 10px; }
+.support-form textarea { min-height: 112px; padding: 10px; resize: vertical; line-height: 1.6; }
+.support-form select:focus, .support-form textarea:focus { border-color: var(--cyan); box-shadow: 0 0 0 2px #2ce9d31d; }
+.support-form-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.support-form-footer small { color: #7f7187; font-size: 7px; }
+.support-form-footer button { min-width: 100px; min-height: 39px; border: 1px solid #6ff7e6aa; border-radius: 10px; background: linear-gradient(135deg, #35ead5, #16ac9e); color: #071311; font-size: 9px; font-weight: 950; cursor: pointer; }
+.support-form-footer button:disabled { opacity: .55; cursor: wait; }
+.support-error { margin: 0; color: #ff91a5; font-size: 8px; line-height: 1.5; }
+.support-history { min-width: 0; }
+.support-history-head { display: flex; align-items: center; justify-content: space-between; padding: 2px 2px 8px; }
+.support-history-head h3 { margin: 0; font-size: 10px; }
+.support-history-head span { color: #776a7e; font-size: 7px; }
+.support-empty { margin: 0; padding: 22px 12px; border: 1px dashed #ffffff18; border-radius: 13px; color: #7f7187; font-size: 8px; text-align: center; }
+.support-ticket-list { display: grid; gap: 8px; }
+.support-ticket { padding: 11px 12px; border: 1px solid #ffffff12; border-radius: 13px; background: #ffffff05; }
+.support-ticket > div { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.support-ticket > div span { color: #bfb0c6; font-size: 7px; font-weight: 800; }
+.support-ticket > div b { flex: none; padding: 3px 7px; border: 1px solid #ffffff18; border-radius: 999px; color: #b6a7bd; font-size: 6px; }
+.support-ticket > div b.status-in_progress { border-color: #58bfff55; color: #87ccff; }
+.support-ticket > div b.status-resolved { border-color: #2ce9d355; color: #65eadb; }
+.support-ticket > div b.status-closed { color: #817486; }
+.support-ticket > p { margin: 8px 0 0; color: #eee5f1; font-size: 8px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+.support-ticket blockquote { display: grid; gap: 4px; margin: 9px 0 0; padding: 9px 10px; border-left: 2px solid var(--cyan); border-radius: 0 8px 8px 0; background: #2ce9d30b; color: #cfeeea; font-size: 8px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
+.support-ticket blockquote strong { color: var(--cyan); font-size: 7px; }
+.support-ticket time { display: block; margin-top: 8px; color: #695d70; font-size: 6px; }
+
+@media (max-width: 520px) {
+  .support-form select, .support-form textarea { font-size: 16px; }
+  .support-form select { min-height: 44px; }
+  .support-form-footer button { min-height: 44px; }
+}
 
 .result-backdrop { align-items: center; padding: 12px; overflow: hidden auto; background: #07030bd9; backdrop-filter: blur(14px) saturate(1.12); }
 .result-card {

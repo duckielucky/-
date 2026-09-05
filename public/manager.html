@@ -999,6 +999,40 @@
   .username-error{min-height:18px;color:var(--danger);font-size:11px}.username-error.ok{color:var(--ok)}
   .account-security{display:flex;align-items:center;justify-content:space-between;gap:16px}
   .account-security-copy{display:grid;gap:2px}.account-security-copy b{font-size:14px}.account-security-copy span{color:var(--dim);font-size:11px}
+  .support-toolbar{display:grid;grid-template-columns:repeat(2,minmax(0,220px));gap:10px;margin-bottom:10px}
+  .support-toolbar label{display:grid;gap:5px}.support-toolbar label span{color:var(--dim);font-size:10px;font-weight:700}
+  .support-toolbar select{min-height:40px;padding:0 11px;border:1px solid var(--line-strong);border-radius:11px;background:#100716;color:var(--ink);outline:0}
+  .support-toolbar select:focus{border-color:var(--cyan);box-shadow:0 0 0 2px #2ce9d32e}
+  .support-manager-note{margin:0;color:var(--dim);font-size:11px}
+  .support-inbox,.admin-list{display:grid;gap:10px;margin-top:14px}
+  .support-manager-empty{padding:28px 14px;border:1px dashed var(--line-strong);border-radius:13px;color:var(--dim);font-size:12px;text-align:center}
+  .support-manager-ticket{padding:14px;border:1px solid var(--line);border-radius:14px;background:#100716}
+  .support-manager-ticket-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px}
+  .support-manager-ticket-player{display:grid;gap:2px;min-width:0}.support-manager-ticket-player strong{overflow:hidden;text-overflow:ellipsis;font-size:13px}.support-manager-ticket-player span{color:var(--dim);font-family:var(--mono);font-size:9px}
+  .support-manager-ticket-kind{flex:none;padding:4px 8px;border:1px solid #a83cff55;border-radius:999px;background:#a83cff17;color:#d9a5ff;font-size:9px;font-weight:800}
+  .support-manager-ticket-kind.is-report{border-color:#e6b53c55;background:#e6b53c12;color:var(--gold)}
+  .support-manager-ticket-message{margin:12px 0 0;color:#e8dfed;font-size:12px;line-height:1.65;white-space:pre-wrap;overflow-wrap:anywhere}
+  .support-manager-ticket-meta{display:flex;flex-wrap:wrap;gap:7px 12px;margin-top:9px;color:var(--dim);font-size:9px}
+  .support-manager-ticket-form{display:grid;grid-template-columns:minmax(130px,.3fr) minmax(0,1fr) auto;gap:9px;align-items:end;margin-top:13px;padding-top:13px;border-top:1px solid var(--line)}
+  .support-manager-ticket-form label{display:grid;gap:5px}.support-manager-ticket-form label span{color:var(--dim);font-size:9px}
+  .support-manager-ticket-form select,.support-manager-ticket-form textarea{width:100%;min-height:40px;padding:9px 10px;border:1px solid var(--line-strong);border-radius:10px;background:#16091f;color:var(--ink);outline:0;font-size:12px}
+  .support-manager-ticket-form textarea{height:64px;resize:vertical;line-height:1.45}
+  .support-manager-ticket-form select:focus,.support-manager-ticket-form textarea:focus{border-color:var(--cyan);box-shadow:0 0 0 2px #2ce9d32e}
+  .support-manager-ticket-form .btn{min-height:40px}
+  .admin-session-summary{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 14px;border:1px solid var(--line);border-radius:13px;background:#100716}
+  .admin-session-summary div{display:grid;gap:2px}.admin-session-summary span{color:var(--dim);font-size:10px}.admin-session-summary strong{font-size:14px}
+  .admin-session-summary>b{padding:4px 9px;border:1px solid #2ce9d34d;border-radius:999px;background:#2ce9d30e;color:var(--cyan);font-size:9px}
+  .admin-permission-note{margin:11px 0;color:var(--dim);font-size:11px}
+  .admin-create-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:14px;padding:14px;border:1px solid #a83cff40;border-radius:14px;background:#a83cff0b}
+  .admin-create-actions{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .admin-create-actions span{color:var(--danger);font-size:11px}.admin-create-actions .btn{min-width:145px}
+  .admin-action-auth{display:flex;align-items:end;justify-content:space-between;gap:14px;margin-top:12px;padding:12px;border:1px solid var(--line);border-radius:13px;background:#100716}
+  .admin-action-auth label{display:grid;gap:5px;min-width:min(100%,320px)}.admin-action-auth label span,.admin-action-auth small{color:var(--dim);font-size:10px}
+  .admin-action-auth input{min-height:40px;padding:8px 10px;border:1px solid var(--line-strong);border-radius:10px;background:#16091f;color:var(--ink);outline:0}.admin-action-auth input:focus{border-color:var(--cyan);box-shadow:0 0 0 2px #2ce9d32e}
+  .admin-row{display:grid;grid-template-columns:42px minmax(0,1fr) auto;gap:11px;align-items:center;padding:12px;border:1px solid var(--line);border-radius:13px;background:#100716}
+  .admin-row-avatar{width:42px;height:42px;display:grid;place-items:center;border:1px solid #a83cff4d;border-radius:12px;background:#a83cff20;color:#d9a5ff;font-size:17px;font-weight:850}
+  .admin-row-copy{display:grid;gap:2px;min-width:0}.admin-row-copy strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.admin-row-copy span{color:var(--dim);font-size:10px}
+  .admin-row-actions{display:flex;align-items:center;gap:9px}.admin-status{color:var(--ok);font-size:10px;font-weight:700}.admin-status.off{color:var(--dim)}
 
   @media (max-width:760px){
     .topbar{padding:11px 14px}.brand h1{font-size:13px}.brand p{display:none}
@@ -1011,6 +1045,11 @@
     .category-save-copy{display:none}.category-save .btn{width:100%}
     .account-username-form{grid-template-columns:1fr}.account-security{align-items:flex-start;flex-direction:column}
     .player-search{grid-template-columns:34px minmax(0,1fr)}.player-search .btn{grid-column:1/-1;width:100%}
+    .support-toolbar,.admin-create-form{grid-template-columns:1fr}
+    .support-manager-ticket-form{grid-template-columns:1fr}.support-manager-ticket-form .btn{width:100%}
+    .admin-create-actions{align-items:stretch;flex-direction:column}.admin-create-actions .btn{width:100%}
+    .admin-action-auth{align-items:stretch;flex-direction:column}.admin-action-auth label{min-width:0}
+    .admin-row{grid-template-columns:42px minmax(0,1fr)}.admin-row-actions{grid-column:1/-1;justify-content:flex-end}
   }
 
   /* The manager categories become a compact top bar on phones. */
@@ -1046,6 +1085,8 @@
     .account-actions{justify-content:flex-start}
     body[data-manager-view="overview"] .mobar,
     body[data-manager-view="players"] .mobar,
+    body[data-manager-view="support"] .mobar,
+    body[data-manager-view="admins"] .mobar,
     body[data-manager-view="account"] .mobar{display:none}
     body[data-manager-view="topups"] .mobar-rtp{display:none}
     body[data-manager-view="topups"] .mobar .btn{width:100%;justify-content:center}
@@ -1105,8 +1146,16 @@
       <span class="manager-nav-index">04</span>
       <span class="manager-nav-copy"><b>玩家记录</b></span>
     </button>
-    <button class="manager-nav-btn" type="button" data-manager-target="account">
+    <button class="manager-nav-btn" type="button" data-manager-target="support">
       <span class="manager-nav-index">05</span>
+      <span class="manager-nav-copy"><b>客服中心</b></span>
+    </button>
+    <button class="manager-nav-btn" type="button" data-manager-target="admins">
+      <span class="manager-nav-index">06</span>
+      <span class="manager-nav-copy"><b>管理员</b></span>
+    </button>
+    <button class="manager-nav-btn" type="button" data-manager-target="account">
+      <span class="manager-nav-index">07</span>
       <span class="manager-nav-copy"><b>账户设置</b></span>
     </button>
   </nav>
@@ -1274,7 +1323,7 @@
       <button class="btn btn-primary" type="button" data-save-config="topups" disabled>保存并应用</button>
     </div>
 
-    <!-- 同一浏览器上的玩家盈亏概览 -->
+    <!-- 云端玩家盈亏概览 -->
     <section class="card sec" data-manager-section="overview">
       <div class="sec-head">
         <h2>玩家盈亏概览</h2>
@@ -1307,11 +1356,11 @@
       </div>
     </section>
 
-    <!-- 同一浏览器上的玩家记录 -->
+    <!-- 云端玩家记录 -->
     <section class="card sec" data-manager-section="players" hidden>
       <div class="sec-head">
         <h2 id="playerDetailHeading">玩家明细</h2>
-        <span class="tag">仅此浏览器</span>
+        <span class="tag" id="playerDataSourceBadge">云端同步</span>
         <button class="info" type="button" data-help="player" aria-label="玩家记录怎么用">i</button>
       </div>
       <form class="player-search" id="playerSearchForm" role="search" novalidate>
@@ -1329,7 +1378,7 @@
         </div>
         <span class="player-kind" id="playerKind">玩家</span>
       </div>
-      <p class="player-report-meta" id="playerReportMeta">搜索本浏览器保存的玩家记录。不会显示密码或安全资料。</p>
+      <p class="player-report-meta" id="playerReportMeta">搜索云端玩家记录（无法连接时回退到本浏览器）。不会显示密码或安全资料。</p>
       <div class="player-stats" id="playerStats" hidden>
         <div><span>代币余额</span><b id="playerBalance">—</b></div>
         <div><span>已刮票数</span><b id="playerTickets">—</b></div>
@@ -1349,7 +1398,7 @@
               <div class="field"><label for="editPlayerEmail">邮箱</label><input id="editPlayerEmail" name="email" type="email" maxlength="254" autocomplete="off" /></div>
               <div class="field"><label for="editPlayerAvatar">头像</label><select id="editPlayerAvatar" name="avatar"></select></div>
               <div class="field"><label for="editPlayerColor">主题色</label><select id="editPlayerColor" name="color"></select></div>
-              <div class="field"><label for="editPlayerPassword">重设密码 <em>选填</em></label><input id="editPlayerPassword" name="newPassword" type="password" minlength="4" maxlength="128" autocomplete="new-password" placeholder="留空则不修改" /><small>不会显示现有密码或密钥。</small></div>
+              <div class="field"><label for="editPlayerPassword">重设密码 <em>选填</em></label><input id="editPlayerPassword" name="newPassword" type="password" minlength="8" maxlength="128" autocomplete="new-password" placeholder="至少 8 位；留空不修改" /><small>不会显示现有密码或密钥。</small></div>
             </div>
           </section>
           <fieldset id="playerGameEditor">
@@ -1390,10 +1439,48 @@
       <div class="player-log" id="playerLog"><div class="player-log-empty">尚未读取玩家记录</div></div>
     </section>
 
+    <section class="card sec" data-manager-section="support" hidden>
+      <div class="sec-head">
+        <h2>客服与举报</h2>
+        <span class="tag" id="supportInboxCount">0 条</span>
+        <button class="btn" id="btnRefreshSupport" type="button" style="margin-left:auto;padding:5px 11px;font-size:12px">刷新</button>
+      </div>
+      <div class="support-toolbar">
+        <label><span>类型</span><select id="supportKindFilter"><option value="">全部</option><option value="support">客服</option><option value="report">举报 / 反馈</option></select></label>
+        <label><span>状态</span><select id="supportStatusFilter"><option value="">全部</option><option value="open">待处理</option><option value="in_progress">处理中</option><option value="resolved">已回复</option><option value="closed">已关闭</option></select></label>
+      </div>
+      <p class="support-manager-note">玩家从游戏内提交；回复与处理状态会同步到玩家的客服记录。</p>
+      <div class="support-inbox" id="supportInbox"><div class="support-manager-empty">正在读取客服记录…</div></div>
+    </section>
+
+    <section class="card sec" data-manager-section="admins" hidden>
+      <div class="sec-head">
+        <h2>管理员账号</h2>
+        <span class="tag" id="adminCount">—</span>
+      </div>
+      <div class="admin-session-summary">
+        <div><span>当前身份</span><strong id="adminSessionName">Admin</strong></div>
+        <b id="adminSessionRole">所有者</b>
+      </div>
+      <p class="admin-permission-note" id="adminPermissionNote">只有所有者可以建立或停用其他管理员。</p>
+      <form class="admin-create-form" id="adminCreateForm" novalidate hidden>
+        <div class="field"><label for="newAdminUsername">新管理员用户名</label><input id="newAdminUsername" type="text" minlength="3" maxlength="32" pattern="[A-Za-z][A-Za-z0-9_]{2,31}" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="例如 Support01" /></div>
+        <div class="field"><label for="newAdminPassword">登录密码</label><input id="newAdminPassword" type="password" minlength="10" maxlength="128" autocomplete="new-password" placeholder="至少 10 位" /></div>
+        <div class="field"><label for="newAdminConfirm">确认密码</label><input id="newAdminConfirm" type="password" minlength="10" maxlength="128" autocomplete="new-password" /></div>
+        <div class="field"><label for="newAdminOwnerPassword">所有者当前密码</label><input id="newAdminOwnerPassword" type="password" autocomplete="current-password" /></div>
+        <div class="admin-create-actions"><span id="adminCreateError" role="alert" aria-live="polite"></span><button class="btn btn-primary" id="btnCreateAdmin" type="submit">建立管理员</button></div>
+      </form>
+      <div class="admin-action-auth" id="adminActionAuth" hidden>
+        <label for="adminActionPassword"><span>停用或启用账号时确认所有者密码</span><input id="adminActionPassword" type="password" autocomplete="current-password" placeholder="所有者当前密码" /></label>
+        <small>密码只用于本次安全操作，不会保存在页面中。</small>
+      </div>
+      <div class="admin-list" id="adminList"><div class="support-manager-empty">正在读取管理员账号…</div></div>
+    </section>
+
     <section class="card sec" data-manager-section="account" hidden>
       <div class="sec-head">
         <h2>账户设置</h2>
-        <span class="tag">安全会话</span>
+        <span class="tag" id="managerRoleBadge">安全会话</span>
       </div>
       <div class="account-identity">
         <div class="account-current">
@@ -1530,7 +1617,7 @@
         </div>
       </form>
       <p style="margin:14px 0 0;font-size:11px;line-height:1.6;color:var(--dim)">
-        提示：Cloudflare 里设置的 <code style="font-family:var(--mono)">MANAGER_TOKEN</code> 密钥仍可作为应急恢复凭据登录。
+        安全提示：<code style="font-family:var(--mono)">MANAGER_TOKEN</code> 只用于签署会话，不能作为登录密码。忘记密码时请使用受控的初始密码迁移或由已登录管理员修改。
       </p>
     </div>
   </section>
@@ -1554,9 +1641,13 @@
   var CONFIG_API = "/api/config";
   var SESSION_API = "/api/manager/session";
   var USERNAME_API = "/api/manager/username";
+  var ADMINS_API = "/api/manager/admins";
+  var SUPPORT_API = "/api/manager/support";
+  var PLAYERS_API = "/api/manager/players";
   var LOGIN_URL = "/manager-login.html?next=%2Fmanager.html";
   var CHANNEL_NAME = "lucky-config";
   var SCHEMA_VERSION = 1;
+  var currentManagerSession = { managerId: "", username: "Admin", role: "admin" };
 
   // Mirrors the built-in defaults in app/page.tsx. Keep in sync if the game changes.
   function defaultConfig() {
@@ -1624,11 +1715,22 @@
   var num = function (n) { return Number(n).toLocaleString("zh-CN"); };
   var pct = function (n, d) { return (n * 100).toFixed(d === undefined ? 1 : d) + "%"; };
   var mean = function (a) { return a.length ? a.reduce(function (s, v) { return s + v; }, 0) / a.length : 0; };
-  function applyManagerIdentity(username) {
+  function applyManagerIdentity(username, role, managerId) {
     var value = String(username || "Admin").trim() || "Admin";
+    currentManagerSession.username = value;
+    if (role === "owner" || role === "admin") currentManagerSession.role = role;
+    if (typeof managerId === "string") currentManagerSession.managerId = managerId;
     $("managerIdentity").textContent = value;
     $("managerIdentityAccount").textContent = value;
     $("managerAvatar").textContent = value.slice(0, 1).toUpperCase();
+    $("adminSessionName").textContent = value;
+    $("adminSessionRole").textContent = currentManagerSession.role === "owner" ? "所有者" : "管理员";
+    $("managerRoleBadge").textContent = currentManagerSession.role === "owner" ? "所有者 · 安全会话" : "管理员 · 安全会话";
+    $("adminCreateForm").hidden = currentManagerSession.role !== "owner";
+    $("adminActionAuth").hidden = currentManagerSession.role !== "owner";
+    $("adminPermissionNote").textContent = currentManagerSession.role === "owner"
+      ? "只有所有者可以建立或停用其他管理员。每位管理员使用自己的用户名和密码登录。"
+      : "你的账号可以管理游戏与客服记录；只有所有者可以建立或停用管理员。";
     if (document.activeElement !== $("managerUsernameNew")) $("managerUsernameNew").value = value;
   }
   function compact(n) {
@@ -1654,7 +1756,15 @@
     },
     players: {
       title: "玩家记录",
-      badge: "本机数据"
+      badge: "云端玩家"
+    },
+    support: {
+      title: "客服中心",
+      badge: "客服与举报"
+    },
+    admins: {
+      title: "管理员",
+      badge: "账号权限"
     },
     account: {
       title: "账户设置",
@@ -1691,6 +1801,8 @@
       try { title.focus({ preventScroll: true }); } catch (e) { title.focus(); }
       title.scrollIntoView({ behavior: opts.instant ? "auto" : "smooth", block: "start", inline: "nearest" });
     }
+    if (managerStarted && view === "support") void loadSupportInbox(false);
+    if (managerStarted && view === "admins") void loadAdmins(false);
   }
 
   document.querySelectorAll("[data-manager-target]").forEach(function (button) {
@@ -1725,7 +1837,7 @@
       title: "运营后台使用说明", sub: "这个后台是用来干嘛的",
       body: [
         { h: "它管什么", p: "这里配置每种<b>刮刮乐票种</b>的经济参数——奖金池、倍数池、票价、中奖概率，也可以管理游戏里展示的<b>虚拟金币充值套餐</b>。票种参数会影响玩家的<b>赔付率（RTP）</b>。" },
-        { h: "怎么改", p: "<b>总览</b>集中显示玩家盈亏；修改票种时先打开<b>票种系统</b>并选择票种。配套、玩家记录和账户操作各自独立；手机上五个分类会显示在页面顶部。配置改动后点 <b>保存并应用</b> 才生效。" },
+        { h: "怎么改", p: "<b>总览</b>集中显示玩家盈亏；修改票种时先打开<b>票种系统</b>并选择票种。配套、玩家、客服、管理员和账户操作各自独立；手机上分类会显示在页面顶部。配置改动后点 <b>保存并应用</b> 才生效。" },
         { h: "先盯这个数", p: "右侧<b>实时赔付率 RTP</b> 是最关键的指标：低于 100% 在回收金币，高于 100% 每卖一张都在净发金币。健康区间大约 <b>45%–90%</b>。" },
         { h: "备份与还原", p: "<b>导出配置</b> 存成 JSON 备份；<b>导入配置</b> 载入旧备份；<b>恢复默认</b> 回到出厂参数（会清掉当前改动，慎用）。" },
         { h: "上线前先验证", p: "用<b>模拟验证</b>跑几万张票，看实测赔付率和理论值是否接近，确认没配错再保存。" },
@@ -1778,7 +1890,7 @@
         { h: "这是全局设置", p: "充值套餐不属于某个票种。每个套餐包含一个 <b>RM 套餐价格</b>和一个<b>虚拟代币数量</b>，所有设备都会读取同一份云端配置；套餐可独立设置折扣或赠送数量。" },
         { h: "怎么改", p: "点<b>新增套餐</b>添加一行，直接修改套餐价格或代币数量；点<b>删除套餐</b>移除。最多保留 20 个套餐，也可以全部删除来关闭游戏内充值入口。" },
         { h: "什么时候生效", p: "修改后必须点<b>保存并应用</b>。游戏会自动取得新配置，已经打开的设备通常会在 30 秒内刷新。" },
-        { warn: "当前是<b>演示充值</b>：不会调用支付平台、不会真实扣款，虚拟代币只写入玩家当前设备的本地存档。若以后接真实付款，必须另建服务端账户账本、支付回调和防重复入账机制。" }
+        { warn: "当前是<b>演示充值</b>：不会调用支付平台、不会真实扣款；虚拟代币会写入玩家云端存档并跨设备同步。若以后接真实付款，必须另建服务端账户账本、支付回调和防重复入账机制。" }
       ]
     },
     economy: {
@@ -1791,20 +1903,20 @@
       ]
     },
     player: {
-      title: "玩家记录", sub: "查看当前浏览器里某个本地玩家的进度",
+      title: "玩家记录", sub: "查看和编辑云端玩家资料与游戏进度",
       body: [
         { h: "能看到什么", p: "输入用户名后可查看玩家名称、余额、输赢、充值历史与最近 80 笔交易流；作弊加币会标成<b>开发者试用</b>。" },
         { h: "编辑玩家", p: "选中玩家后可修改账户资料、重设密码、余额、进度、累计数字、票种最高中奖与偏好，也可重置进度或删除普通玩家。" },
-        { h: "数据在哪里", p: "玩家账号与进度目前只保存在同一浏览器的本地存储，所以这里只能读取<b>这台设备</b>玩过的玩家。不会读取或显示密码、哈希或安全字段。" },
-        { warn: "这不是跨设备的正式玩家账本。若要查看所有真实玩家，必须把账号与交易记录迁移到受保护的云端数据库。" }
+        { h: "数据在哪里", p: "玩家账号与游戏进度保存在受保护的云端数据库；修改后会同步到玩家的其他设备。后台不会读取或显示现有密码、哈希或安全字段。" },
+        { warn: "云端连接中断时只会显示只读缓存，保存、重置与删除都会停用，避免把本机资料误当成真实玩家记录。" }
       ]
     },
     playerOverview: {
-      title: "玩家盈亏概览", sub: "同一浏览器里的玩家表现",
+      title: "玩家盈亏概览", sub: "云端玩家的累计与近七天表现",
       body: [
         { h: "累计数字", p: "<b>累计中奖</b>与<b>累计购票花费</b>来自每名玩家的游戏存档；净输赢 = 中奖 − 花费。平台净额从运营角度计算为花费 − 中奖。" },
         { h: "每日图表", p: "绿色是每日中奖，红色是每日购票花费。充值、救济和<b>开发者试用</b>不会计入游戏盈亏。" },
-        { warn: "概览只包含当前浏览器保存的玩家，不代表其他设备上的玩家数据。" }
+        { warn: "概览读取云端玩家汇总；云端离线时仅显示上一次缓存并保持只读。" }
       ]
     },
     rtp: {
@@ -2325,6 +2437,9 @@
   var playerAdmin = window.LuckyPlayerAdmin;
   var playerAnalytics = window.LuckyManagerAnalytics;
   var activePlayerUsername = null;
+  var activePlayerRevision = null;
+  var activePlayerIsCloud = false;
+  var playerEditorDirty = false;
   function normalizePlayerUsername(value) {
     return playerAdmin.normalizeUsername(value);
   }
@@ -2359,10 +2474,91 @@
       return b.spent - a.spent || b.won - a.won || a.username.localeCompare(b.username);
     });
   }
+  // ---- authoritative player data from D1 (cached/local data is read-only) ----
+  var cloudPlayerRaw = null;
+  var cloudPlayerSummaries = null;
+  var playerDataSource = "local";
+
+  function sortPlayerSummaries(list) {
+    return list.sort(function (a, b) {
+      return b.spent - a.spent || b.won - a.won || a.username.localeCompare(b.username);
+    });
+  }
+  function summarisePlayerRows(rows) {
+    return sortPlayerSummaries(rows.map(function (row) {
+      return row && row.summary
+        ? row.summary
+        : playerAnalytics.summarisePlayer(row.username, row.account, row.save);
+    }));
+  }
+  function collectPlayerSummaries() {
+    return cloudPlayerSummaries || collectLocalPlayerSummaries();
+  }
+  function findCloudPlayerRow(username) {
+    if (!cloudPlayerRaw) return null;
+    for (var i = 0; i < cloudPlayerRaw.length; i += 1) {
+      if (normalizePlayerUsername(cloudPlayerRaw[i].username) === username) return cloudPlayerRaw[i];
+    }
+    return null;
+  }
+  async function loadCloudPlayers() {
+    try {
+      var response = await fetch(PLAYERS_API, {
+        method: "GET", credentials: "same-origin", cache: "no-store",
+        headers: { "accept": "application/json" }
+      });
+      if (response.status === 401) { redirectToLogin(isDirty()); return false; }
+      if (!response.ok) throw new Error("HTTP " + response.status);
+      var data = await response.json();
+      if (!data || !Array.isArray(data.players)) throw new Error("Invalid player response");
+      var previousRows = cloudPlayerRaw || [];
+      cloudPlayerRaw = data.players.map(function (row) {
+        var previous = previousRows.find(function (item) {
+          return normalizePlayerUsername(item.username) === normalizePlayerUsername(row.username);
+        });
+        return previous && previous.save && Number(previous.revision) === Number(row.revision)
+          ? Object.assign({}, row, { save: previous.save })
+          : row;
+      });
+      cloudPlayerSummaries = summarisePlayerRows(data.players);
+      playerDataSource = "cloud";
+      $("playerDataSourceBadge").textContent = "云端同步";
+      renderPlayerOverview();
+      return true;
+    } catch (e) { /* retain the last visible snapshot but never write it */ }
+    playerDataSource = cloudPlayerSummaries ? "offline" : "local";
+    $("playerDataSourceBadge").textContent = "云端离线 · 只读";
+    renderPlayerOverview();
+    return false;
+  }
+
+  async function loadCloudPlayerDetail(username) {
+    if (playerDataSource !== "cloud") return null;
+    var normalized = normalizePlayerUsername(username);
+    if (!normalized) return null;
+    try {
+      var response = await fetch(PLAYERS_API + "?username=" + encodeURIComponent(normalized), {
+        method: "GET", credentials: "same-origin", cache: "no-store",
+        headers: { "accept": "application/json" }
+      });
+      var data = await response.json().catch(function () { return null; });
+      if (response.status === 401) { redirectToLogin(isDirty()); return null; }
+      if (response.status >= 500) throw new Error("HTTP " + response.status);
+      if (!response.ok || !data || !data.player) return null;
+      replaceCloudPlayerRow(normalized, data.player);
+      return data.player;
+    } catch (e) {
+      playerDataSource = "offline";
+      $("playerDataSourceBadge").textContent = "云端离线 · 只读";
+      renderPlayerOverview();
+      return null;
+    }
+  }
+
   function refreshPlayerOptions(players) {
     var options = $("playerNameOptions");
     options.innerHTML = "";
-    (players || collectLocalPlayerSummaries()).forEach(function (player) {
+    (players || collectPlayerSummaries()).forEach(function (player) {
       var option = document.createElement("option");
       option.value = player.username;
       options.appendChild(option);
@@ -2408,15 +2604,20 @@
       return day.label + "中奖" + tokenText(day.won) + "、花费" + tokenText(day.spent);
     }).join("；"));
   }
-  function openPlayerFromOverview(username) {
+  async function openPlayerFromOverview(username) {
     $("playerLookup").value = username;
     setManagerView("players", { focus: false });
+    var row = findCloudPlayerRow(normalizePlayerUsername(username));
+    if (playerDataSource === "cloud" && row && !Object.prototype.hasOwnProperty.call(row, "save")) {
+      $("playerReportMeta").textContent = "正在读取云端玩家资料…";
+      await loadCloudPlayerDetail(username);
+    }
     renderPlayerReport();
     var heading = $("playerDetailHeading");
     if (heading && heading.scrollIntoView) heading.scrollIntoView({ behavior: "smooth", block: "start" });
   }
   function renderPlayerOverview() {
-    var players = collectLocalPlayerSummaries();
+    var players = collectPlayerSummaries();
     refreshPlayerOptions(players);
     var totals = players.reduce(function (summary, player) {
       summary.won += player.won;
@@ -2437,7 +2638,7 @@
       var emptyRow = document.createElement("tr");
       var emptyCell = document.createElement("td");
       emptyCell.colSpan = 4;
-      emptyCell.innerHTML = '<div class="player-overview-empty">当前浏览器还没有玩家记录</div>';
+      emptyCell.innerHTML = '<div class="player-overview-empty">' + (playerDataSource === "cloud" ? "云端还没有玩家记录" : "当前浏览器还没有玩家记录") + '</div>';
       emptyRow.appendChild(emptyCell);
       body.appendChild(emptyRow);
     } else {
@@ -2451,7 +2652,7 @@
         var username = document.createElement("small");
         username.textContent = "@" + player.username;
         open.appendChild(username);
-        open.onclick = function () { openPlayerFromOverview(player.username); };
+        open.onclick = function () { void openPlayerFromOverview(player.username); };
         identity.appendChild(open);
         var won = document.createElement("td");
         won.textContent = tokenText(player.won);
@@ -2507,6 +2708,8 @@
   }
   function setPlayerReportEmpty(message) {
     activePlayerUsername = null;
+    activePlayerRevision = null;
+    activePlayerIsCloud = false;
     $("playerIdentity").hidden = true;
     $("playerStats").hidden = true;
     $("playerEditor").hidden = true;
@@ -2569,19 +2772,23 @@
     var role = playerRole(account, username);
     var player = savedGame && savedGame.player && typeof savedGame.player === "object" ? savedGame.player : null;
     activePlayerUsername = username;
+    var cloudRow = findCloudPlayerRow(username);
+    activePlayerIsCloud = Boolean(cloudRow);
+    activePlayerRevision = cloudRow && Number.isSafeInteger(Number(cloudRow.revision)) ? Number(cloudRow.revision) : null;
+    var writable = activePlayerIsCloud && playerDataSource === "cloud";
     $("playerEditor").hidden = false;
     $("playerEditorRole").textContent = role === "test" ? "TEST PLAYER" : "PLAYER";
     $("editPlayerUsername").value = account && account.username ? account.username : username;
-    $("editPlayerUsername").disabled = role === "test";
+    $("editPlayerUsername").disabled = role === "test" || !writable;
     $("editPlayerDisplayName").value = account && account.displayName ? account.displayName : username;
     $("editPlayerEmail").value = account && account.email ? account.email : "";
     $("editPlayerAvatar").value = account && playerAdmin.AVATARS.indexOf(account.avatar) >= 0 ? account.avatar : playerAdmin.AVATARS[0];
     $("editPlayerColor").value = account && playerAdmin.COLORS.indexOf(account.color) >= 0 ? account.color : playerAdmin.COLORS[0];
     $("editPlayerPassword").value = "";
     ["editPlayerDisplayName", "editPlayerEmail", "editPlayerAvatar", "editPlayerColor"].forEach(function (id) {
-      $(id).disabled = !account;
+      $(id).disabled = !account || !writable;
     });
-    $("editPlayerPassword").disabled = !account || role === "test";
+    $("editPlayerPassword").disabled = !account || role === "test" || !writable;
     $("editPlayerCoins").value = String(Math.floor(safePlayerNumber(player ? player.coins : account && account.coins)));
     $("editPlayerTickets").value = String(Math.floor(safePlayerNumber(player && player.ticketsPlayed)));
     syncPlayerEditorLevel();
@@ -2596,19 +2803,24 @@
     $("editPlayerClearHistory").checked = false;
     renderBestWinEditor(player && player.bestWins);
     $("playerGameEditor").disabled = false;
-    ["editPlayerTickets", "editPlayerWon", "editPlayerSpent", "editPlayerTicket", "editPlayerSound", "editPlayerVibration", "editPlayerTutorial", "editPlayerRescue", "editPlayerClearHistory"].forEach(function (id) {
-      $(id).disabled = !player;
+    ["editPlayerCoins", "editPlayerTickets", "editPlayerWon", "editPlayerSpent", "editPlayerTicket", "editPlayerSound", "editPlayerVibration", "editPlayerTutorial", "editPlayerRescue", "editPlayerClearHistory"].forEach(function (id) {
+      $(id).disabled = !player || !writable;
     });
-    $("playerBestWinsEditor").querySelectorAll("input").forEach(function (input) { input.disabled = !player; });
-    $("playerEditorGameHint").textContent = player ? "等级会按已刮票数自动计算" : "这名玩家尚未开始游戏；账户资料与初始余额仍可编辑";
-    $("btnDeletePlayer").disabled = role === "test";
+    $("playerBestWinsEditor").querySelectorAll("input").forEach(function (input) { input.disabled = !player || !writable; });
+    $("playerEditorGameHint").textContent = !writable
+      ? "云端连接不可用；当前资料只读，恢复连接后才能修改"
+      : (player ? "等级会按已刮票数自动计算" : "这名玩家尚未建立云端游戏进度；目前只能编辑账户资料");
+    $("btnSavePlayer").disabled = !writable;
+    $("btnResetPlayer").disabled = role === "test" || !writable;
+    $("btnDeletePlayer").disabled = role === "test" || !writable;
     $("playerEditorStatus").textContent = "";
     $("playerEditorStatus").classList.remove("is-error");
+    playerEditorDirty = false;
   }
   function renderPlayerReport() {
     var rawUsername = String($("playerLookup").value || "").trim();
     if (!rawUsername) {
-      $("playerReportMeta").textContent = "搜索本浏览器保存的玩家记录。不会显示密码或安全资料。";
+      $("playerReportMeta").textContent = playerDataSource === "cloud" ? "搜索云端玩家记录。不会显示密码或安全资料。" : "云端暂时不可用，正在显示本浏览器记录。";
       setPlayerReportEmpty("尚未读取玩家记录");
       renderPlayerOverview();
       return;
@@ -2622,22 +2834,40 @@
     }
     var accounts;
     var savedGame;
+    var cloudRow = findCloudPlayerRow(username);
+    if (playerDataSource === "cloud" && cloudRow && !Object.prototype.hasOwnProperty.call(cloudRow, "save")) {
+      $("playerReportMeta").textContent = "请选择搜索按钮读取完整的云端玩家资料。";
+      setPlayerReportEmpty("尚未读取完整玩家记录");
+      renderPlayerOverview();
+      return;
+    }
     try {
-      var parsedAccounts = JSON.parse(localStorage.getItem(PLAYER_ACCOUNTS_KEY) || "{}");
-      accounts = parsedAccounts && typeof parsedAccounts === "object" && !Array.isArray(parsedAccounts) ? parsedAccounts : {};
-      var rawSave = localStorage.getItem(PLAYER_SAVE_PREFIX + username);
-      savedGame = rawSave ? JSON.parse(rawSave) : null;
+      if (cloudRow) {
+        accounts = {};
+        accounts[username] = cloudRow.account || null;
+        savedGame = cloudRow.save || null;
+      } else if (playerDataSource === "cloud") {
+        accounts = {};
+        savedGame = null;
+      } else {
+        var parsedAccounts = JSON.parse(localStorage.getItem(PLAYER_ACCOUNTS_KEY) || "{}");
+        accounts = parsedAccounts && typeof parsedAccounts === "object" && !Array.isArray(parsedAccounts) ? parsedAccounts : {};
+        var rawSave = localStorage.getItem(PLAYER_SAVE_PREFIX + username);
+        savedGame = rawSave ? JSON.parse(rawSave) : null;
+      }
     } catch (e) {
-      $("playerReportMeta").textContent = "本浏览器里的玩家记录无法读取或已经损坏。";
-      setPlayerReportEmpty("无法解析本地玩家记录");
+      $("playerReportMeta").textContent = cloudRow ? "这名玩家的云端记录无法读取或已经损坏。" : "本浏览器里的玩家记录无法读取或已经损坏。";
+      setPlayerReportEmpty("无法解析玩家记录");
       renderPlayerOverview();
       return;
     }
     var account = Object.prototype.hasOwnProperty.call(accounts, username) ? accounts[username] : null;
     var player = savedGame && savedGame.player && typeof savedGame.player === "object" ? savedGame.player : null;
     if (!account && !player) {
-      $("playerReportMeta").textContent = "本浏览器没有找到玩家「" + username + "」。请先在这台设备登录并玩一局。";
-      setPlayerReportEmpty("没有本机玩家数据");
+      $("playerReportMeta").textContent = playerDataSource === "cloud"
+        ? "云端没有找到玩家「" + username + "」。"
+        : "本浏览器没有找到玩家「" + username + "」。请先在这台设备登录并玩一局。";
+      setPlayerReportEmpty("没有玩家数据");
       renderPlayerOverview();
       return;
     }
@@ -2665,7 +2895,9 @@
     $("playerSpent").textContent = playerAmountText(spent);
     $("playerNet").textContent = (net >= 0 ? "+" : "−") + playerAmountText(Math.abs(net));
     $("playerNet").style.color = net >= 0 ? "var(--ok)" : "var(--danger)";
-    $("playerReportMeta").textContent = "数据仅来自当前浏览器，可被本机用户修改。";
+    $("playerReportMeta").textContent = cloudRow && playerDataSource === "cloud"
+      ? "云端同步记录 · 修改后会同步到玩家的所有设备。"
+      : "云端暂时不可用，当前资料只读。";
     populatePlayerEditor(username, account, savedGame);
 
     var log = player && Array.isArray(player.log) ? player.log.slice(0, 80) : [];
@@ -2689,19 +2921,82 @@
     renderPlayerOverview();
   }
 
-  $("playerSearchForm").onsubmit = function (event) {
+  $("playerSearchForm").onsubmit = async function (event) {
     event.preventDefault();
+    var username = normalizePlayerUsername(String($("playerLookup").value || "").trim());
+    var row = username ? findCloudPlayerRow(username) : null;
+    if (username && playerDataSource === "cloud" && (!row || !Object.prototype.hasOwnProperty.call(row, "save"))) {
+      $("playerReportMeta").textContent = "正在读取云端玩家资料…";
+      await loadCloudPlayerDetail(username);
+    }
     renderPlayerReport();
   };
   $("editPlayerTickets").addEventListener("input", syncPlayerEditorLevel);
+  $("playerEditorForm").addEventListener("input", function () { playerEditorDirty = true; });
+  $("playerEditorForm").addEventListener("change", function () { playerEditorDirty = true; });
+  function replaceCloudPlayerRow(previousUsername, nextRow) {
+    var previous = normalizePlayerUsername(previousUsername);
+    var replaced = false;
+    cloudPlayerRaw = (cloudPlayerRaw || []).map(function (row) {
+      if (normalizePlayerUsername(row.username) !== previous) return row;
+      replaced = true;
+      return nextRow;
+    });
+    if (!replaced) cloudPlayerRaw.push(nextRow);
+    cloudPlayerSummaries = summarisePlayerRows(cloudPlayerRaw);
+    playerDataSource = "cloud";
+    $("playerDataSourceBadge").textContent = "云端同步";
+    renderPlayerOverview();
+  }
+  function lockPlayerEditorOffline() {
+    $("playerEditorForm").querySelectorAll("input,select,button").forEach(function (control) { control.disabled = true; });
+    $("playerEditorGameHint").textContent = "云端连接不可用；未保存的输入仍保留，恢复连接后请重新读取再提交";
+  }
+  async function requestCloudPlayer(method, payload) {
+    try {
+      var response = await fetch(PLAYERS_API, {
+        method: method,
+        credentials: "same-origin",
+        cache: "no-store",
+        headers: { "accept": "application/json", "content-type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      var data = await response.json().catch(function () { return null; });
+      if (response.status === 401) { redirectToLogin(isDirty()); return { ok: false, status: 401, data: data }; }
+      return { ok: response.ok, status: response.status, data: data };
+    } catch (e) {
+      playerDataSource = "offline";
+      $("playerDataSourceBadge").textContent = "云端离线 · 只读";
+      lockPlayerEditorOffline();
+      return { ok: false, status: 0, data: null };
+    }
+  }
+  function cloudPlayerError(result, fallback) {
+    if (result && result.data && result.data.code === "revision_conflict") return "玩家资料已在其他设备更新，请重新读取后再保存。";
+    if (result && result.data && result.data.code === "identity_conflict") return "用户名或邮箱已被其他玩家使用。";
+    if (result && result.data && typeof result.data.error === "string") return result.data.error;
+    return fallback;
+  }
   $("playerEditorForm").addEventListener("submit", async function (event) {
     event.preventDefault();
     if (!activePlayerUsername) return;
     var status = $("playerEditorStatus");
     status.textContent = ""; status.classList.remove("is-error");
+    var originalUsername = activePlayerUsername;
+    var cloudRow = activePlayerIsCloud ? findCloudPlayerRow(originalUsername) : null;
+    if (playerDataSource !== "cloud" || !activePlayerIsCloud) {
+      status.textContent = "云端连接不可用，当前资料只读，尚未保存任何更改。";
+      status.classList.add("is-error");
+      toast("云端离线，玩家资料未保存", "err");
+      return;
+    }
+    if (activePlayerIsCloud && !cloudRow) {
+      status.textContent = "云端玩家资料已变化，请重新搜索。"; status.classList.add("is-error");
+      return;
+    }
     var requestedUsername = String($("editPlayerUsername").value || "").trim();
     var normalizedRequested = normalizePlayerUsername(requestedUsername);
-    if (normalizedRequested && normalizedRequested !== activePlayerUsername && !window.confirm("修改用户名会迁移这名玩家的本机存档，并让该玩家重新载入游戏。继续吗？")) return;
+    if (normalizedRequested && normalizedRequested !== activePlayerUsername && !window.confirm("修改用户名会更新这名玩家的云端账号，并让现有登录重新验证。继续吗？")) return;
     if ($("editPlayerClearHistory").checked && !window.confirm("确定清空这名玩家的交易记录和每日图表吗？累计中奖与花费不会自动归零。")) return;
     var bestWins = {};
     $("playerBestWinsEditor").querySelectorAll("input[data-ticket-id]").forEach(function (input) {
@@ -2729,34 +3024,87 @@
     var button = $("btnSavePlayer");
     button.disabled = true; button.textContent = "保存中…";
     try {
-      var result = await playerAdmin.updatePlayer(activePlayerUsername, patch);
-      if (!result.ok) {
-        status.textContent = result.error; status.classList.add("is-error");
-        toast(result.error, "err");
-        return;
+      if (cloudRow) {
+        var cloudPatch = {
+          targetUsername: originalUsername,
+          expectedRevision: activePlayerRevision === null ? Number(cloudRow.revision || 0) : activePlayerRevision,
+          username: patch.username,
+          displayName: patch.displayName,
+          email: patch.email,
+          avatar: patch.avatar,
+          color: patch.color
+        };
+        if (patch.newPassword) cloudPatch.newPassword = patch.newPassword;
+        if (cloudRow.save && cloudRow.save.player) {
+          ["coins", "ticketsPlayed", "totalWon", "totalSpent", "selectedTicketId", "bestWins", "sound", "vibration", "tutorialSeen", "rescueReady", "clearHistory"].forEach(function (key) {
+            cloudPatch[key] = patch[key];
+          });
+        }
+        var cloudResult = await requestCloudPlayer("PATCH", cloudPatch);
+        if (!cloudResult.ok || !cloudResult.data || !cloudResult.data.player) {
+          var cloudError = cloudPlayerError(cloudResult, "无法保存云端玩家资料，请稍后重试。");
+          status.textContent = cloudError; status.classList.add("is-error"); toast(cloudError, "err");
+          if (cloudResult.status === 409) void loadCloudPlayers();
+          return;
+        }
+        replaceCloudPlayerRow(originalUsername, cloudResult.data.player);
+        $("playerLookup").value = cloudResult.data.player.username;
+        activePlayerUsername = cloudResult.data.player.username;
+        playerEditorDirty = false;
+        renderPlayerReport();
       }
-      $("playerLookup").value = result.username;
-      activePlayerUsername = result.username;
-      renderPlayerReport();
       toast("玩家资料已保存并应用", "ok");
     } finally {
-      button.disabled = false; button.textContent = "保存玩家";
+      button.disabled = playerDataSource !== "cloud"; button.textContent = "保存玩家";
     }
   });
-  $("btnResetPlayer").onclick = function () {
+  $("btnResetPlayer").onclick = async function () {
     if (!activePlayerUsername || !window.confirm("确定把这名玩家的游戏进度恢复为新账户状态吗？此操作无法撤销。")) return;
-    var result = playerAdmin.resetProgress(activePlayerUsername);
-    if (!result.ok) { toast(result.error, "err"); return; }
-    renderPlayerReport();
-    toast("玩家进度已重置", "ok");
+    if (playerDataSource !== "cloud" || !activePlayerIsCloud) { toast("云端离线，无法重置玩家进度", "err"); return; }
+    if (activePlayerIsCloud) {
+      var cloudRow = findCloudPlayerRow(activePlayerUsername);
+      if (!cloudRow) { toast("云端玩家资料已变化，请重新搜索", "err"); return; }
+      var cloudResult = await requestCloudPlayer("PATCH", {
+        targetUsername: activePlayerUsername,
+        expectedRevision: activePlayerRevision === null ? Number(cloudRow.revision || 0) : activePlayerRevision,
+        action: "reset"
+      });
+      if (!cloudResult.ok || !cloudResult.data || !cloudResult.data.player) {
+        toast(cloudPlayerError(cloudResult, "无法重置云端玩家进度"), "err");
+        if (cloudResult.status === 409) void loadCloudPlayers();
+        return;
+      }
+      replaceCloudPlayerRow(activePlayerUsername, cloudResult.data.player);
+      playerEditorDirty = false;
+      renderPlayerReport();
+      toast("玩家云端进度已重置", "ok");
+      return;
+    }
   };
-  $("btnDeletePlayer").onclick = function () {
-    if (!activePlayerUsername || !window.confirm("确定永久删除这名玩家及其本机存档吗？此操作无法撤销。")) return;
-    var result = playerAdmin.deletePlayer(activePlayerUsername);
-    if (!result.ok) { toast(result.error, "err"); return; }
-    $("playerLookup").value = "";
-    renderPlayerReport();
-    toast("玩家已删除", "ok");
+  $("btnDeletePlayer").onclick = async function () {
+    if (!activePlayerUsername || !window.confirm("确定永久删除这名玩家及其全部云端记录吗？此操作无法撤销。")) return;
+    if (playerDataSource !== "cloud" || !activePlayerIsCloud) { toast("云端离线，无法删除玩家", "err"); return; }
+    if (activePlayerIsCloud) {
+      var cloudRow = findCloudPlayerRow(activePlayerUsername);
+      if (!cloudRow) { toast("云端玩家资料已变化，请重新搜索", "err"); return; }
+      var cloudResult = await requestCloudPlayer("DELETE", {
+        targetUsername: activePlayerUsername,
+        expectedRevision: activePlayerRevision === null ? Number(cloudRow.revision || 0) : activePlayerRevision
+      });
+      if (!cloudResult.ok) {
+        toast(cloudPlayerError(cloudResult, "无法删除云端玩家"), "err");
+        if (cloudResult.status === 409) void loadCloudPlayers();
+        return;
+      }
+      var deletedUsername = activePlayerUsername;
+      cloudPlayerRaw = (cloudPlayerRaw || []).filter(function (row) { return normalizePlayerUsername(row.username) !== deletedUsername; });
+      cloudPlayerSummaries = summarisePlayerRows(cloudPlayerRaw);
+      $("playerLookup").value = "";
+      playerEditorDirty = false;
+      renderPlayerReport();
+      toast("玩家及云端记录已删除", "ok");
+      return;
+    }
   };
 
   function renderGauge() {
@@ -3131,6 +3479,185 @@
     });
   });
 
+  // ---------- customer service and reports ----------
+  var SUPPORT_STATUS_LABELS = { open: "待处理", in_progress: "处理中", resolved: "已回复", closed: "已关闭" };
+  var SUPPORT_CATEGORY_LABELS = {
+    account: "账户问题", gameplay: "游戏问题", topup: "充值问题", bug: "功能异常",
+    player: "举报玩家", cheating: "疑似作弊", abuse: "不当行为", other: "其他"
+  };
+  var supportLoading = false;
+
+  function managerDate(value) {
+    var date = new Date(Number(value));
+    return isNaN(date.getTime()) ? "—" : date.toLocaleString("zh-CN", { hour12: false });
+  }
+  function setSupportInboxMessage(message) {
+    $("supportInbox").textContent = "";
+    var empty = document.createElement("div");
+    empty.className = "support-manager-empty";
+    empty.textContent = message;
+    $("supportInbox").appendChild(empty);
+  }
+  function renderSupportInbox(tickets) {
+    var inbox = $("supportInbox");
+    inbox.textContent = "";
+    $("supportInboxCount").textContent = tickets.length + " 条";
+    if (!tickets.length) { setSupportInboxMessage("没有符合条件的客服记录"); return; }
+    tickets.forEach(function (ticket) {
+      var article = document.createElement("article");
+      article.className = "support-manager-ticket";
+
+      var head = document.createElement("div"); head.className = "support-manager-ticket-head";
+      var player = document.createElement("div"); player.className = "support-manager-ticket-player";
+      var playerName = document.createElement("strong");
+      playerName.textContent = (ticket.player && ticket.player.displayName) || (ticket.player && ticket.player.username) || "未知玩家";
+      var playerMeta = document.createElement("span");
+      var username = ticket.player && ticket.player.username ? "@" + ticket.player.username : "账号未知";
+      var email = ticket.player && ticket.player.email ? " · " + ticket.player.email : "";
+      playerMeta.textContent = username + email;
+      player.appendChild(playerName); player.appendChild(playerMeta);
+      var kind = document.createElement("b");
+      kind.className = "support-manager-ticket-kind" + (ticket.kind === "report" ? " is-report" : "");
+      kind.textContent = ticket.kind === "report" ? "举报 / 反馈" : "客服";
+      head.appendChild(player); head.appendChild(kind); article.appendChild(head);
+
+      var message = document.createElement("p"); message.className = "support-manager-ticket-message"; message.textContent = String(ticket.message || ""); article.appendChild(message);
+      var meta = document.createElement("div"); meta.className = "support-manager-ticket-meta";
+      var category = document.createElement("span"); category.textContent = SUPPORT_CATEGORY_LABELS[ticket.category] || ticket.category || "其他";
+      var created = document.createElement("span"); created.textContent = managerDate(ticket.createdAt);
+      var ticketId = document.createElement("span"); ticketId.textContent = "#" + String(ticket.id || "").slice(-8);
+      meta.appendChild(category); meta.appendChild(created); meta.appendChild(ticketId); article.appendChild(meta);
+
+      var form = document.createElement("form"); form.className = "support-manager-ticket-form";
+      var statusLabel = document.createElement("label"); var statusTitle = document.createElement("span"); statusTitle.textContent = "处理状态";
+      var status = document.createElement("select");
+      Object.keys(SUPPORT_STATUS_LABELS).forEach(function (key) { var option = document.createElement("option"); option.value = key; option.textContent = SUPPORT_STATUS_LABELS[key]; option.selected = ticket.status === key; status.appendChild(option); });
+      statusLabel.appendChild(statusTitle); statusLabel.appendChild(status);
+      var replyLabel = document.createElement("label"); var replyTitle = document.createElement("span"); replyTitle.textContent = "回复玩家";
+      var reply = document.createElement("textarea"); reply.maxLength = 2000; reply.placeholder = "填写回复（选择已回复时必填）"; reply.value = typeof ticket.reply === "string" ? ticket.reply : "";
+      replyLabel.appendChild(replyTitle); replyLabel.appendChild(reply);
+      var save = document.createElement("button"); save.type = "submit"; save.className = "btn btn-primary"; save.textContent = "保存处理";
+      form.appendChild(statusLabel); form.appendChild(replyLabel); form.appendChild(save);
+      form.addEventListener("submit", async function (event) {
+        event.preventDefault();
+        if (status.value === "resolved" && !reply.value.trim()) { toast("选择“已回复”时必须填写回复内容", "err"); reply.focus(); return; }
+        save.disabled = true; save.textContent = "保存中…";
+        try {
+          var response = await fetch(SUPPORT_API, {
+            method: "PATCH", credentials: "same-origin", cache: "no-store",
+            headers: { "accept": "application/json", "content-type": "application/json" },
+            body: JSON.stringify({ id: ticket.id, status: status.value, reply: reply.value.trim() || null })
+          });
+          if (response.status === 401) { redirectToLogin(isDirty()); return; }
+          var payload = await response.json().catch(function () { return null; });
+          if (!response.ok) { toast(payload && payload.error ? payload.error : "无法保存客服记录", "err"); return; }
+          toast("客服记录已更新，玩家端会同步显示");
+          await loadSupportInbox(false);
+        } catch (error) { toast("网络连接失败，请稍后重试", "err"); }
+        finally { save.disabled = false; save.textContent = "保存处理"; }
+      });
+      article.appendChild(form); inbox.appendChild(article);
+    });
+  }
+  async function loadSupportInbox(showLoading) {
+    if (supportLoading) return;
+    supportLoading = true;
+    if (showLoading !== false) setSupportInboxMessage("正在读取客服记录…");
+    var params = new URLSearchParams({ limit: "100" });
+    if ($("supportKindFilter").value) params.set("kind", $("supportKindFilter").value);
+    if ($("supportStatusFilter").value) params.set("status", $("supportStatusFilter").value);
+    try {
+      var response = await fetch(SUPPORT_API + "?" + params.toString(), { method: "GET", credentials: "same-origin", cache: "no-store", headers: { "accept": "application/json" } });
+      if (response.status === 401) { redirectToLogin(isDirty()); return; }
+      var payload = await response.json().catch(function () { return null; });
+      if (!response.ok || !payload || !Array.isArray(payload.tickets)) { setSupportInboxMessage("暂时无法读取客服记录"); return; }
+      renderSupportInbox(payload.tickets);
+    } catch (error) { setSupportInboxMessage("网络连接失败，请稍后刷新"); }
+    finally { supportLoading = false; }
+  }
+  $("btnRefreshSupport").onclick = function () { void loadSupportInbox(true); };
+  $("supportKindFilter").onchange = function () { void loadSupportInbox(true); };
+  $("supportStatusFilter").onchange = function () { void loadSupportInbox(true); };
+
+  // ---------- owner-controlled administrator profiles ----------
+  var adminLoading = false;
+  function setAdminListMessage(message) {
+    $("adminList").textContent = "";
+    var empty = document.createElement("div"); empty.className = "support-manager-empty"; empty.textContent = message; $("adminList").appendChild(empty);
+  }
+  function renderAdminList(admins) {
+    var list = $("adminList"); list.textContent = ""; $("adminCount").textContent = admins.length + " 个账号";
+    admins.forEach(function (admin) {
+      var row = document.createElement("article"); row.className = "admin-row";
+      var avatar = document.createElement("div"); avatar.className = "admin-row-avatar"; avatar.setAttribute("aria-hidden", "true"); avatar.textContent = String(admin.username || "A").slice(0, 1).toUpperCase();
+      var copy = document.createElement("div"); copy.className = "admin-row-copy";
+      var name = document.createElement("strong"); name.textContent = admin.username || "—";
+      var detail = document.createElement("span"); detail.textContent = admin.role === "owner" ? "所有者 · 主账号" : "管理员 · " + (admin.active ? "可以登录" : "已停用");
+      copy.appendChild(name); copy.appendChild(detail);
+      var actions = document.createElement("div"); actions.className = "admin-row-actions";
+      var state = document.createElement("span"); state.className = "admin-status" + (admin.active ? "" : " off"); state.textContent = admin.active ? "启用中" : "已停用"; actions.appendChild(state);
+      if (admin.role !== "owner") {
+        var toggle = document.createElement("button"); toggle.type = "button"; toggle.className = "btn"; toggle.textContent = admin.active ? "停用" : "重新启用";
+        toggle.addEventListener("click", async function () {
+          var currentPassword = $("adminActionPassword").value;
+          if (!currentPassword) { toast("请先输入所有者当前密码", "err"); $("adminActionPassword").focus(); return; }
+          toggle.disabled = true;
+          try {
+            var response = await fetch(ADMINS_API, {
+              method: "PATCH", credentials: "same-origin", cache: "no-store",
+              headers: { "accept": "application/json", "content-type": "application/json" },
+              body: JSON.stringify({ managerId: admin.managerId, active: !admin.active, currentPassword: currentPassword })
+            });
+            if (response.status === 401) { toast("所有者密码不正确，或会话已过期", "err"); return; }
+            if (!response.ok) { toast("无法更新管理员状态", "err"); return; }
+            $("adminActionPassword").value = "";
+            toast(admin.active ? "管理员已停用，现有会话也已失效" : "管理员已重新启用");
+            await loadAdmins(false);
+          } catch (error) { toast("网络连接失败，请稍后重试", "err"); }
+          finally { toggle.disabled = false; }
+        });
+        actions.appendChild(toggle);
+      }
+      row.appendChild(avatar); row.appendChild(copy); row.appendChild(actions); list.appendChild(row);
+    });
+  }
+  async function loadAdmins(showLoading) {
+    if (currentManagerSession.role !== "owner") { $("adminCount").textContent = "仅所有者"; setAdminListMessage("只有所有者可以查看和管理管理员账号"); return; }
+    if (adminLoading) return; adminLoading = true;
+    if (showLoading !== false) setAdminListMessage("正在读取管理员账号…");
+    try {
+      var response = await fetch(ADMINS_API, { method: "GET", credentials: "same-origin", cache: "no-store", headers: { "accept": "application/json" } });
+      if (response.status === 401) { redirectToLogin(isDirty()); return; }
+      var payload = await response.json().catch(function () { return null; });
+      if (!response.ok || !payload || !Array.isArray(payload.admins)) { setAdminListMessage("暂时无法读取管理员账号"); return; }
+      renderAdminList(payload.admins);
+    } catch (error) { setAdminListMessage("网络连接失败，请稍后刷新"); }
+    finally { adminLoading = false; }
+  }
+  $("adminCreateForm").onsubmit = async function (event) {
+    event.preventDefault();
+    var username = $("newAdminUsername").value.trim(); var password = $("newAdminPassword").value; var confirmPassword = $("newAdminConfirm").value; var ownerPassword = $("newAdminOwnerPassword").value;
+    var message = $("adminCreateError"); message.textContent = "";
+    if (!/^[A-Za-z][A-Za-z0-9_]{2,31}$/.test(username)) { message.textContent = "用户名须为 3–32 位，以字母开头。"; return; }
+    if (password.length < 10 || password.length > 128) { message.textContent = "密码须为 10–128 位。"; return; }
+    if (password !== confirmPassword) { message.textContent = "两次输入的密码不一致。"; return; }
+    if (!ownerPassword) { message.textContent = "请输入所有者当前密码。"; return; }
+    var button = $("btnCreateAdmin"); button.disabled = true; button.textContent = "建立中…";
+    try {
+      var response = await fetch(ADMINS_API, {
+        method: "POST", credentials: "same-origin", cache: "no-store",
+        headers: { "accept": "application/json", "content-type": "application/json" },
+        body: JSON.stringify({ username: username, password: password, currentPassword: ownerPassword })
+      });
+      var payload = await response.json().catch(function () { return null; });
+      if (response.status === 401) { message.textContent = "所有者当前密码不正确。"; return; }
+      if (response.status === 409) { message.textContent = "这个管理员用户名已存在。"; return; }
+      if (!response.ok) { message.textContent = payload && payload.error ? payload.error : "无法建立管理员。"; return; }
+      $("adminCreateForm").reset(); toast("管理员账号已建立，可以使用自己的用户名和密码登录"); await loadAdmins(false);
+    } catch (error) { message.textContent = "网络连接失败，请稍后重试。"; }
+    finally { button.disabled = false; button.textContent = "建立管理员"; }
+  };
+
   $("btnLogout").onclick = async function () {
     if (syncBusy) { toast("请等待当前发布完成后再退出", "err"); return; }
     if (isDirty() && !window.confirm("当前未发布的更改会保留为本机草稿。确定退出运营后台吗？")) return;
@@ -3404,7 +3931,7 @@
     renderGauge();
     renderOverview();
     renderDirty();
-    if (normalizePlayerUsername($("playerLookup").value)) renderPlayerReport();
+    if (normalizePlayerUsername($("playerLookup").value) && !playerEditorDirty) renderPlayerReport();
     else renderPlayerOverview();
   }
 
@@ -3440,7 +3967,7 @@
       try {
         var sessionPayload = await response.json();
         if (sessionPayload && sessionPayload.username) {
-          applyManagerIdentity(sessionPayload.username);
+          applyManagerIdentity(sessionPayload.username, sessionPayload.role, sessionPayload.managerId);
         }
       } catch (ignore) {}
       return true;
@@ -3462,7 +3989,14 @@
     managerStarted = true;
     document.body.classList.remove("auth-checking");
     loadRemote(false);
-    window.setInterval(function () { if (!document.hidden && !isDirty()) loadRemote(true); }, 30000);
+    void loadCloudPlayers();
+    void loadSupportInbox(false);
+    void loadAdmins(false);
+    window.setInterval(function () {
+      if (document.hidden) return;
+      if (!isDirty()) loadRemote(true);
+      void loadCloudPlayers();
+    }, 30000);
   }
 
   $("authRetry").onclick = function () { void startManager(); };
