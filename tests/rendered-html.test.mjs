@@ -240,7 +240,7 @@ test("ships the game systems and installable assets", async () => {
   assert.match(page, /BroadcastChannel/);
   assert.match(page, /function initialPlayerFor\(/);
   assert.match(page, /window\.addEventListener\("storage", onStorage\)/);
-  assert.match(page, /运营后台已更新玩家资料/);
+  assert.doesNotMatch(page, /运营后台已更新玩家资料/);
   assert.match(page, /result-particles/);
   assert.match(page, /WinConfetti.*intensity/s);
   assert.match(styles, /--effect-power/);

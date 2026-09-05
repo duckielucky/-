@@ -1428,7 +1428,6 @@ export default function Home() {
           setTicket(restored.ticket);
           settleLock.current = Boolean(restored.ticket?.settled);
           setShowResult(false);
-          setToast("运营后台已更新玩家资料");
         } catch { /* ignore a damaged external edit */ }
         return;
       }
