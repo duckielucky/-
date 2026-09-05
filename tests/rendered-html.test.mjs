@@ -259,6 +259,10 @@ test("ships the game systems and installable assets", async () => {
   assert.match(styles, /prismatic-scratch-gesture\.png/);
   assert.match(styles, /\.tile-content\s*\{[^}]*z-index:\s*1[^}]*\}/);
   assert.match(styles, /\.scratch-canvas\s*\{[^}]*z-index:\s*2[^}]*\}/);
+  assert.match(styles, /\.scratch-canvas\s*\{[^}]*touch-action:\s*none[^}]*overscroll-behavior:\s*none[^}]*-webkit-touch-callout:\s*none[^}]*\}/);
+  assert.match(page, /canvas\.addEventListener\("touchmove", preventTouchScroll, \{ passive: false \}\)/);
+  assert.match(page, /canvas\.removeEventListener\("touchmove", preventTouchScroll\)/);
+  assert.match(page, /onPointerMove=\{\(event\) => \{[^}]*event\.preventDefault\(\)/);
   assert.match(page, /revealed \? "is-miss"/);
   assert.match(page, /匹配<\/em>/);
   assert.match(styles, /revealed-tile-miss\.png/);

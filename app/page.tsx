@@ -670,6 +670,12 @@ function ScratchTile({ cell, revealed, matched, accent, sound, coinsPerToken, on
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+    // Mobile Safari can treat delegated touch handlers as passive. Register on
+    // the foil itself before a gesture starts so scratching cannot pan the page.
+    const preventTouchScroll = (event: TouchEvent) => {
+      if (event.cancelable) event.preventDefault();
+    };
+    canvas.addEventListener("touchmove", preventTouchScroll, { passive: false });
     const drawCover = () => {
       const rect = canvas.getBoundingClientRect();
       const ratio = Math.min(window.devicePixelRatio || 1, 2);
@@ -708,7 +714,11 @@ function ScratchTile({ cell, revealed, matched, accent, sound, coinsPerToken, on
       drawCover();
     });
     observer.observe(canvas);
-    return () => { observer.disconnect(); stopWaitingForFoil(); };
+    return () => {
+      canvas.removeEventListener("touchmove", preventTouchScroll);
+      observer.disconnect();
+      stopWaitingForFoil();
+    };
   }, []);
 
   const revealIfReady = useCallback(() => {
@@ -769,9 +779,9 @@ function ScratchTile({ cell, revealed, matched, accent, sound, coinsPerToken, on
         ref={canvasRef}
         className="scratch-canvas"
         aria-hidden="true"
-        onPointerDown={(event) => { if (revealedRef.current) return; coverTouchedRef.current = true; drawingRef.current = true; onScratchStart(); event.currentTarget.setPointerCapture(event.pointerId); const point = pointFor(event); lastPoint.current = point; eraseTo(point); }}
-        onPointerMove={(event) => { if (!drawingRef.current || revealedRef.current) return; eraseTo(pointFor(event)); revealIfReady(); }}
-        onPointerUp={(event) => { drawingRef.current = false; lastPoint.current = null; try { event.currentTarget.releasePointerCapture(event.pointerId); } catch { /* Some browsers release capture automatically. */ } revealIfReady(); }}
+        onPointerDown={(event) => { if (revealedRef.current) return; event.preventDefault(); coverTouchedRef.current = true; drawingRef.current = true; onScratchStart(); event.currentTarget.setPointerCapture(event.pointerId); const point = pointFor(event); lastPoint.current = point; eraseTo(point); }}
+        onPointerMove={(event) => { if (!drawingRef.current || revealedRef.current) return; event.preventDefault(); eraseTo(pointFor(event)); revealIfReady(); }}
+        onPointerUp={(event) => { event.preventDefault(); drawingRef.current = false; lastPoint.current = null; try { event.currentTarget.releasePointerCapture(event.pointerId); } catch { /* Some browsers release capture automatically. */ } revealIfReady(); }}
         onPointerCancel={() => { drawingRef.current = false; lastPoint.current = null; revealIfReady(); }}
       />
     </div>
